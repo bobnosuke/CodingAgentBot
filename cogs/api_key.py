@@ -4,6 +4,7 @@ Handles API key registration and management
 """
 import discord
 from discord.ext import commands
+from discord import app_commands
 from logger import setup_logger
 from modules.security.permissions import user_command
 from modules.database.repository import UserRepository, APIKeyRepository
@@ -23,27 +24,20 @@ class APIKeyCog(commands.Cog):
         """
         self.bot = bot
     
-    @commands.command(name="api-key")
-    async def api_key(self, ctx: commands.Context):
-        """Base API key command"""
-        await ctx.send(
-            "🔑 API Key Management\n"
-            "Usage: `!api-key register`, `!api-key remove`"
-        )
+    api_key_group = app_commands.Group(name="api-key", description="API Key management commands")
     
-    @commands.command(name="register")
-    @user_command
-    async def api_key_register(self, ctx: commands.Context, api_key: str):
+    @api_key_group.command(name="register", description="Register your OpenRouter API key")
+    async def api_key_register(self, interaction: discord.Interaction, api_key: str):
         """
         Register OpenRouter API key
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
             api_key: OpenRouter API key
         """
         try:
-            # Acknowledge and defer
-            await ctx.defer(ephemeral=True)
+            # Defer response
+            await interaction.response.defer(ephemeral=True)
             
             # Get database session
             db_session = self.bot.db_manager.get_session()
@@ -52,9 +46,9 @@ class APIKeyCog(commands.Cog):
                 # Get or create user
                 user = await UserRepository.get_or_create_user(
                     db_session,
-                    str(ctx.author.id),
-                    ctx.author.name,
-                    ctx.author.discriminator
+                    str(interaction.user.id),
+                    interaction.user.name,
+                    interaction.user.discriminator
                 )
                 
                 # Encrypt API key
@@ -64,8 +58,8 @@ class APIKeyCog(commands.Cog):
                 existing_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
                 
                 if existing_key:
-                    # Update existing key (in a real app, we might want to keep history)
-                    logger.info(f"User {ctx.author.id} updated their API key")
+                    # Update existing key
+                    logger.info(f"User {interaction.user.id} updated their API key")
                 else:
                     # Create new key
                     await APIKeyRepository.create_api_key(
@@ -75,35 +69,34 @@ class APIKeyCog(commands.Cog):
                         "OpenRouter"
                     )
                 
-                await ctx.followup.send(
+                await interaction.followup.send(
                     "✅ API key registered successfully!\n"
                     "Your key is securely encrypted and stored.",
                     ephemeral=True
                 )
                 
-                logger.info(f"API key registered for user {ctx.author.id}")
+                logger.info(f"API key registered for user {interaction.user.id}")
             
             finally:
                 await db_session.close()
         
         except Exception as e:
             logger.error(f"Error in api_key_register: {e}", exc_info=True)
-            await ctx.followup.send(
+            await interaction.followup.send(
                 f"❌ Error registering API key: {str(e)}",
                 ephemeral=True
             )
     
-    @commands.command(name="remove")
-    @user_command
-    async def api_key_remove(self, ctx: commands.Context):
+    @api_key_group.command(name="remove", description="Remove your OpenRouter API key")
+    async def api_key_remove(self, interaction: discord.Interaction):
         """
         Remove OpenRouter API key
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
         """
         try:
-            await ctx.defer(ephemeral=True)
+            await interaction.response.defer(ephemeral=True)
             
             # Get database session
             db_session = self.bot.db_manager.get_session()
@@ -112,11 +105,11 @@ class APIKeyCog(commands.Cog):
                 # Get user
                 user = await UserRepository.get_user_by_discord_id(
                     db_session,
-                    str(ctx.author.id)
+                    str(interaction.user.id)
                 )
                 
                 if not user:
-                    await ctx.followup.send(
+                    await interaction.followup.send(
                         "❌ User not found.",
                         ephemeral=True
                     )
@@ -126,7 +119,7 @@ class APIKeyCog(commands.Cog):
                 api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
                 
                 if not api_key:
-                    await ctx.followup.send(
+                    await interaction.followup.send(
                         "❌ No API key found.",
                         ephemeral=True
                     )
@@ -134,20 +127,20 @@ class APIKeyCog(commands.Cog):
                 
                 # In a real implementation, we would mark it as inactive
                 # For now, just inform the user
-                await ctx.followup.send(
+                await interaction.followup.send(
                     "✅ API key removal requested.\n"
                     "Please register a new key to continue using the bot.",
                     ephemeral=True
                 )
                 
-                logger.info(f"API key removed for user {ctx.author.id}")
+                logger.info(f"API key removed for user {interaction.user.id}")
             
             finally:
                 await db_session.close()
         
         except Exception as e:
             logger.error(f"Error in api_key_remove: {e}", exc_info=True)
-            await ctx.followup.send(
+            await interaction.followup.send(
                 f"❌ Error: {str(e)}",
                 ephemeral=True
             )
@@ -155,4 +148,8 @@ class APIKeyCog(commands.Cog):
 
 async def setup(bot: commands.Bot):
     """Setup function for loading cog"""
-    await bot.add_cog(APIKeyCog(bot))
+    cog = APIKeyCog(bot)
+    await bot.add_cog(cog)
+    # Add command group to app commands tree
+    if cog.api_key_group not in bot.tree.get_commands():
+        bot.tree.add_command(cog.api_key_group)

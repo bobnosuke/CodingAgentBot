@@ -3,6 +3,7 @@ Help and information commands for CoderAgent
 """
 import discord
 from discord.ext import commands
+from discord import app_commands
 from logger import setup_logger
 
 logger = setup_logger(__name__)
@@ -20,13 +21,13 @@ class HelpCog(commands.Cog):
         """
         self.bot = bot
     
-    @commands.command(name="guide")
-    async def guide_command(self, ctx: commands.Context, topic: str = None):
+    @app_commands.command(name="guide", description="Show help guide")
+    async def guide_command(self, interaction: discord.Interaction, topic: str = None):
         """
         Display help information
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
             topic: Optional help topic
         """
         if topic is None:
@@ -39,39 +40,39 @@ class HelpCog(commands.Cog):
             
             embed.add_field(
                 name="🔑 API Key Management",
-                value="• `!api-key register <key>` - Register your OpenRouter API key\n"
-                      "• `!api-key remove` - Remove your API key",
+                value="• `/api-key register` - Register your OpenRouter API key\n"
+                      "• `/api-key remove` - Remove your API key",
                 inline=False
             )
             
             embed.add_field(
                 name="💻 Coding Commands",
-                value="• `!coding start [project_name]` - Start a new coding session\n"
-                      "• `!coding chat <message>` - Chat with AI in your session\n"
-                      "• `!coding end` - End your current session",
+                value="• `/coding start` - Start a new coding session\n"
+                      "• `/coding chat` - Chat with AI in your session\n"
+                      "• `/coding end` - End your current session",
                 inline=False
             )
             
             embed.add_field(
                 name="📁 File Management",
-                value="• `!save <filename> <content>` - Save a file\n"
-                      "• `!list` - List all files in session\n"
-                      "• `!get <filename>` - Get file content\n"
-                      "• `!download` - Download all files as ZIP",
+                value="• `/save` - Save a file\n"
+                      "• `/list` - List all files in session\n"
+                      "• `/get` - Get file content\n"
+                      "• `/download` - Download all files as ZIP",
                 inline=False
             )
             
             embed.add_field(
                 name="ℹ️ Information",
-                value="• `!guide [topic]` - Show this guide\n"
-                      "• `!status` - Show bot status\n"
-                      "• `!about` - About CoderAgent",
+                value="• `/guide` - Show this help menu\n"
+                      "• `/status` - Show bot status\n"
+                      "• `/about` - About CoderAgent",
                 inline=False
             )
             
-            embed.set_footer(text="Use !guide <topic> for more details on a specific topic")
+            embed.set_footer(text="Use /guide <topic> for more details on a specific topic")
             
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed)
         
         elif topic.lower() == "api-key":
             embed = discord.Embed(
@@ -81,7 +82,7 @@ class HelpCog(commands.Cog):
             
             embed.add_field(
                 name="Register API Key",
-                value="```\n!api-key register <your_openrouter_api_key>\n```\n"
+                value="Use `/api-key register <your_openrouter_api_key>`\n"
                       "Your API key is securely encrypted and stored.",
                 inline=False
             )
@@ -96,7 +97,7 @@ class HelpCog(commands.Cog):
                 inline=False
             )
             
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed)
         
         elif topic.lower() == "coding":
             embed = discord.Embed(
@@ -106,26 +107,26 @@ class HelpCog(commands.Cog):
             
             embed.add_field(
                 name="Start Session",
-                value="```\n!coding start [project_name]\n```\n"
+                value="Use `/coding start [project_name]`\n"
                       "Creates a private coding room for you.",
                 inline=False
             )
             
             embed.add_field(
                 name="Chat with AI",
-                value="```\n!coding chat <your_message>\n```\n"
+                value="Use `/coding chat <your_message>`\n"
                       "Ask the AI to generate code, explain concepts, or debug.",
                 inline=False
             )
             
             embed.add_field(
                 name="End Session",
-                value="```\n!coding end\n```\n"
+                value="Use `/coding end`\n"
                       "Closes your session and deletes the coding room.",
                 inline=False
             )
             
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed)
         
         elif topic.lower() == "files":
             embed = discord.Embed(
@@ -135,37 +136,40 @@ class HelpCog(commands.Cog):
             
             embed.add_field(
                 name="Save File",
-                value="```\n!save <filename> <content>\n```\n"
+                value="Use `/save <filename> <content>`\n"
                       "Save code or text to a file in your session.",
                 inline=False
             )
             
             embed.add_field(
                 name="List Files",
-                value="```\n!list\n```\n"
+                value="Use `/list`\n"
                       "See all files in your current session.",
                 inline=False
             )
             
             embed.add_field(
                 name="Download Files",
-                value="```\n!download\n```\n"
+                value="Use `/download`\n"
                       "Download all session files as a ZIP archive.",
                 inline=False
             )
             
-            await ctx.send(embed=embed)
+            await interaction.response.send_message(embed=embed)
         
         else:
-            await ctx.send(f"❓ Unknown help topic: `{topic}`\nUse `!guide` for the main menu.")
+            await interaction.response.send_message(
+                f"❓ Unknown help topic: `{topic}`\nUse `/guide` for the main menu.",
+                ephemeral=True
+            )
     
-    @commands.command(name="about")
-    async def about_command(self, ctx: commands.Context):
+    @app_commands.command(name="about", description="About CoderAgent")
+    async def about_command(self, interaction: discord.Interaction):
         """
         Display information about CoderAgent
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
         """
         embed = discord.Embed(
             title="🤖 About CoderAgent",
@@ -198,21 +202,21 @@ class HelpCog(commands.Cog):
         
         embed.add_field(
             name="Getting Started",
-            value="1. Register your OpenRouter API key: `!api-key register <key>`\n"
-                  "2. Start a coding session: `!coding start`\n"
-                  "3. Chat with AI: `!coding chat <message>`",
+            value="1. Register your OpenRouter API key: `/api-key register <key>`\n"
+                  "2. Start a coding session: `/coding start`\n"
+                  "3. Chat with AI: `/coding chat <message>`",
             inline=False
         )
         
-        await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
     
-    @commands.command(name="status")
-    async def status_command(self, ctx: commands.Context):
+    @app_commands.command(name="status", description="Show bot status")
+    async def status_command(self, interaction: discord.Interaction):
         """
         Display bot status
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
         """
         embed = discord.Embed(
             title="📊 Bot Status",
@@ -249,7 +253,7 @@ class HelpCog(commands.Cog):
             inline=True
         )
         
-        await ctx.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):

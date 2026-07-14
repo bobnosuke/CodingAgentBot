@@ -4,8 +4,9 @@ Handles /coding start, /coding chat, /coding end commands
 """
 import discord
 from discord.ext import commands
+from discord import app_commands
 from logger import setup_logger
-from modules.security.permissions import user_command, PermissionLevel, PermissionManager
+from modules.security.permissions import PermissionLevel, PermissionManager
 from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository
 from modules.session.manager import SessionManager
 from modules.ai.openrouter import OpenRouterClient, AIService
@@ -27,38 +28,32 @@ class CodingCog(commands.Cog):
         self.session_manager = SessionManager(bot)
         self.ai_services = {}  # Cache for AI services per user
     
-    @commands.command(name="coding", aliases=["code"])
-    async def coding(self, ctx: commands.Context):
-        """Base coding command"""
-        await ctx.send(
-            "❓ Usage: `!coding start`, `!coding chat <message>`, `!coding end`\n"
-            "Use `!coding start` to begin a coding session."
-        )
+    coding_group = app_commands.Group(name="coding", description="AI coding commands")
     
-    @commands.command(name="start", parent="coding")
-    @user_command
-    async def coding_start(self, ctx: commands.Context, project_name: str = None):
+    @coding_group.command(name="start", description="Start a new coding session")
+    async def coding_start(self, interaction: discord.Interaction, project_name: str = None):
         """
         Start a new coding session
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
             project_name: Optional project name
         """
         try:
             # Check if user already has active session
-            user_id = str(ctx.author.id)
+            user_id = str(interaction.user.id)
             active_session = self.session_manager.get_user_active_session(user_id)
             
             if active_session:
-                await ctx.send(
+                await interaction.response.send_message(
                     f"❌ You already have an active session: `{active_session[:8]}`\n"
-                    f"Use `/coding end` to close it first."
+                    f"Use `/coding end` to close it first.",
+                    ephemeral=True
                 )
                 return
             
             # Defer response as this may take a while
-            await ctx.defer()
+            await interaction.response.defer()
             
             # Get database session
             db_session = self.bot.db_manager.get_session()
@@ -68,15 +63,15 @@ class CodingCog(commands.Cog):
                 user = await UserRepository.get_or_create_user(
                     db_session,
                     user_id,
-                    ctx.author.name,
-                    ctx.author.discriminator
+                    interaction.user.name,
+                    interaction.user.discriminator
                 )
                 
                 # Check if user has API key
                 api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
                 
                 if not api_key:
-                    await ctx.followup.send(
+                    await interaction.followup.send(
                         "❌ No OpenRouter API key found!\n"
                         "Please register your API key first using `/api-key register`"
                     )
@@ -88,8 +83,8 @@ class CodingCog(commands.Cog):
                 # Create session
                 session_uuid, coding_room = await self.session_manager.create_session(
                     db_session,
-                    ctx.author,
-                    ctx.guild,
+                    interaction.user,
+                    interaction.guild,
                     project_name
                 )
                 
@@ -111,7 +106,7 @@ class CodingCog(commands.Cog):
                 
                 embed.set_footer(text="Use /coding chat to start coding!")
                 
-                await ctx.followup.send(embed=embed)
+                await interaction.followup.send(embed=embed)
                 
                 # Send welcome message in coding room
                 welcome_embed = discord.Embed(
@@ -132,41 +127,46 @@ class CodingCog(commands.Cog):
         
         except Exception as e:
             logger.error(f"Error in coding_start: {e}", exc_info=True)
-            await ctx.followup.send(f"❌ Error starting session: {str(e)}")
+            await interaction.followup.send(f"❌ Error starting session: {str(e)}")
     
-    @commands.command(name="chat")
-    @user_command
-    async def coding_chat(self, ctx: commands.Context, *, message: str):
+    @coding_group.command(name="chat", description="Chat with AI in your coding session")
+    async def coding_chat(self, interaction: discord.Interaction, message: str):
         """
         Chat with AI in coding session
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
             message: User's message
         """
         try:
-            user_id = str(ctx.author.id)
+            user_id = str(interaction.user.id)
             
             # Check if user has active session
             session_uuid = self.session_manager.get_user_active_session(user_id)
             
             if not session_uuid:
-                await ctx.send("❌ You don't have an active coding session. Use `/coding start` first.")
+                await interaction.response.send_message(
+                    "❌ You don't have an active coding session. Use `/coding start` first.",
+                    ephemeral=True
+                )
                 return
             
             # Check if AI service is initialized
             if user_id not in self.ai_services:
-                await ctx.send("❌ AI service not initialized. Please try starting a new session.")
+                await interaction.response.send_message(
+                    "❌ AI service not initialized. Please try starting a new session.",
+                    ephemeral=True
+                )
                 return
             
             # Defer response
-            await ctx.defer()
+            await interaction.response.defer()
             
             # Get AI service
             ai_service = self.ai_services[user_id]
             
             # Send thinking message
-            thinking_msg = await ctx.followup.send("🤔 Thinking...")
+            thinking_msg = await interaction.followup.send("🤔 Thinking...")
             
             try:
                 # Generate response
@@ -191,7 +191,7 @@ class CodingCog(commands.Cog):
                         await thinking_msg.edit(content=chunks[0])
                         
                         for chunk in chunks[1:]:
-                            await ctx.followup.send(chunk)
+                            await interaction.followup.send(chunk)
                     else:
                         await thinking_msg.edit(content=full_response)
                 else:
@@ -203,28 +203,30 @@ class CodingCog(commands.Cog):
         
         except Exception as e:
             logger.error(f"Error in coding_chat: {e}", exc_info=True)
-            await ctx.send(f"❌ Error: {str(e)}")
+            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
     
-    @commands.command(name="end")
-    @user_command
-    async def coding_end(self, ctx: commands.Context):
+    @coding_group.command(name="end", description="End your current coding session")
+    async def coding_end(self, interaction: discord.Interaction):
         """
         End the current coding session
         
         Args:
-            ctx: Command context
+            interaction: Discord interaction
         """
         try:
-            user_id = str(ctx.author.id)
+            user_id = str(interaction.user.id)
             
             # Check if user has active session
             session_uuid = self.session_manager.get_user_active_session(user_id)
             
             if not session_uuid:
-                await ctx.send("❌ You don't have an active coding session.")
+                await interaction.response.send_message(
+                    "❌ You don't have an active coding session.",
+                    ephemeral=True
+                )
                 return
             
-            await ctx.defer()
+            await interaction.response.defer()
             
             # Get database session
             db_session = self.bot.db_manager.get_session()
@@ -243,7 +245,7 @@ class CodingCog(commands.Cog):
                 if user_id in self.ai_services:
                     del self.ai_services[user_id]
                 
-                await ctx.followup.send(
+                await interaction.followup.send(
                     f"✅ Session `{session_uuid[:8]}` closed.\n"
                     f"Your coding room has been deleted."
                 )
@@ -253,9 +255,13 @@ class CodingCog(commands.Cog):
         
         except Exception as e:
             logger.error(f"Error in coding_end: {e}", exc_info=True)
-            await ctx.send(f"❌ Error closing session: {str(e)}")
+            await interaction.response.send_message(f"❌ Error closing session: {str(e)}", ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
     """Setup function for loading cog"""
-    await bot.add_cog(CodingCog(bot))
+    cog = CodingCog(bot)
+    await bot.add_cog(cog)
+    # Add command group to app commands tree
+    if cog.coding_group not in bot.tree.get_commands():
+        bot.tree.add_command(cog.coding_group)
