@@ -65,6 +65,13 @@ class CoderAgent(commands.Bot):
         
         # Load cogs
         await self.load_cogs()
+        
+        # Sync app commands
+        try:
+            synced = await self.tree.sync()
+            logger.info(f"✅ Synced {len(synced)} app command(s)")
+        except Exception as e:
+            logger.error(f"❌ Failed to sync app commands: {e}")
     
     async def load_cogs(self) -> None:
         """Load all cogs from cogs directory"""
