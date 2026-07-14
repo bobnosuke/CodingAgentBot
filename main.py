@@ -65,13 +65,11 @@ class CoderAgent(commands.Bot):
         
         # Load cogs
         await self.load_cogs()
-        
-        # Sync app commands
-        try:
-            synced = await self.tree.sync()
-            logger.info(f"✅ Synced {len(synced)} app command(s)")
-        except Exception as e:
-            logger.error(f"❌ Failed to sync app commands: {e}")
+
+        # Setup global app command error handler
+        from modules.security.errors import ErrorHandler
+        self.tree.on_error = ErrorHandler.handle_error
+        logger.info("✅ App command error handling initialized")
     
     async def load_cogs(self) -> None:
         """Load all cogs from cogs directory"""
@@ -105,21 +103,9 @@ class CoderAgent(commands.Bot):
         logger.error(f"Error in {event}: {args}", exc_info=True)
     
     async def on_command_error(self, ctx: commands.Context, error: commands.CommandError) -> None:
-        """Handle command errors"""
-        if isinstance(error, commands.CommandNotFound):
-            logger.warning(f"Command not found: {ctx.message.content}")
-        elif isinstance(error, commands.MissingRequiredArgument):
-            logger.warning(f"Missing argument for command {ctx.command}: {error}")
-            await ctx.send(f"❌ Missing required argument: {error.param.name}")
-        elif isinstance(error, commands.MissingPermissions):
-            logger.warning(f"Permission denied for {ctx.author}: {error}")
-            await ctx.send("❌ You don't have permission to use this command.")
-        elif isinstance(error, commands.CheckFailure):
-            # This handles our custom permission checks
-            pass  # Message already sent by the check
-        else:
-            logger.error(f"Command error: {error}", exc_info=True)
-            await ctx.send("❌ An error occurred while processing your command.")
+        """Handle command errors using central handler"""
+        from modules.security.errors import ErrorHandler
+        await ErrorHandler.handle_error(ctx, error)
     
     async def close(self) -> None:
         """Cleanup before closing"""
