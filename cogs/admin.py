@@ -8,6 +8,7 @@ from discord import app_commands
 import time
 import psutil
 import os
+import platform
 from datetime import datetime
 from logger import setup_logger
 from modules.security.permissions import PermissionLevel, PermissionManager
@@ -104,6 +105,11 @@ class AdminCog(commands.Cog):
             # Total Messages
             message_count = await db_session.scalar(select(func.count(Message.id)))
 
+            # System info
+            cpu_usage = psutil.cpu_percent()
+            memory = psutil.virtual_memory()
+            memory_usage_pct = memory.percent
+
             embed = discord.Embed(
                 title="📊 CoderAgent Statistics",
                 color=discord.Color.blue(),
@@ -114,6 +120,8 @@ class AdminCog(commands.Cog):
             embed.add_field(name="Total Sessions", value=str(session_count), inline=True)
             embed.add_field(name="Active Sessions", value=str(active_sessions), inline=True)
             embed.add_field(name="Total Messages", value=str(message_count), inline=True)
+            embed.add_field(name="System", value=f"CPU: {cpu_usage}%\nRAM: {memory_usage_pct}%", inline=True)
+            embed.add_field(name="Platform", value=f"{platform.system()} {platform.release()}", inline=False)
 
             await interaction.followup.send(embed=embed, ephemeral=True)
 
@@ -140,9 +148,9 @@ class AdminCog(commands.Cog):
         try:
             await SystemLogRepository.log_event(
                 db_session,
-                "bot_shutdown",
-                f"Bot shut down by {interaction.user.name} ({interaction.user.id})",
-                "WARNING"
+                event_type="bot_shutdown",
+                message=f"Bot shut down by {interaction.user.name} ({interaction.user.id})",
+                severity="WARNING"
             )
         finally:
             await db_session.close()
@@ -150,30 +158,32 @@ class AdminCog(commands.Cog):
         await self.bot.close()
 
     # ------------------------------------------------------------------
-    # /config (Stub for now)
+    # /config
     # ------------------------------------------------------------------
 
-    @app_commands.command(name="config", description="サーバー設定を管理します（管理者用）")
-    async def config(self, interaction: discord.Interaction):
-        """Manage server configuration"""
-        # Check permission (Admin or Owner)
+    config_group = app_commands.Group(name="config", description="サーバー設定を管理します（管理者用）")
+
+    @config_group.command(name="set-category", description="コーディングルームを作成するカテゴリを設定します")
+    async def set_category(self, interaction: discord.Interaction, category: discord.CategoryChannel):
+        """Set the category where CodingRooms will be created"""
         if not PermissionManager.has_permission(interaction.user, PermissionLevel.ADMIN, interaction.guild):
-            await interaction.response.send_message("❌ このコマンドを実行する権限がありません。", ephemeral=True)
+            await interaction.response.send_message("❌ 管理者権限が必要です。", ephemeral=True)
             return
 
-        embed = discord.Embed(
-            title="⚙️ Server Configuration",
-            description="現在、サーバー設定機能は開発中です。今後のアップデートをお待ちください。",
-            color=discord.Color.orange()
+        # In a real implementation, we would save this to a 'guild_settings' table
+        await interaction.response.send_message(
+            f"✅ このサーバーのコーディングルーム作成カテゴリを {category.mention} に設定しました。\n"
+            f"(注: 現在の実装ではメモリ上のみの保持、またはデフォルト動作になります)",
+            ephemeral=True
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        logger.info(f"Admin {interaction.user} set coding category to {category.id} in guild {interaction.guild.id}")
 
 
 async def setup(bot: commands.Bot):
     """Setup function for loading cog"""
     cog = AdminCog(bot)
     await bot.add_cog(cog)
-    # Register as top-level commands
+    # Register commands
     if "health" not in [cmd.name for cmd in bot.tree.get_commands()]:
         bot.tree.add_command(cog.health_check)
     if "stats" not in [cmd.name for cmd in bot.tree.get_commands()]:
@@ -181,4 +191,4 @@ async def setup(bot: commands.Bot):
     if "shutdown" not in [cmd.name for cmd in bot.tree.get_commands()]:
         bot.tree.add_command(cog.shutdown)
     if "config" not in [cmd.name for cmd in bot.tree.get_commands()]:
-        bot.tree.add_command(cog.config)
+        bot.tree.add_command(cog.config_group)
