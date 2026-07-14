@@ -24,20 +24,21 @@
 
 | ID | タスク内容 | 担当 | ステータス | 備考 |
 |----|------------|------|------------|------|
-| 1  | `/setting` コマンドの実装（Embed + Select Menu + Modal） | 未定 | ⬜ 未着手 | 要件定義書 16. /setting仕様 参照 |
-| 2  | `/coding` サブコマンドの拡充（panel, list, info, export, rename, delete） | 未定 | ⬜ 未着手 | 要件定義書 15. コマンド仕様 参照 |
-| 3  | 管理者・オーナー用コマンドの実装（`/config`, `/health`, `/stats`, `/shutdown`） | 未定 | ⬜ 未着手 | 要件定義書 3. 管理者向けコマンド, 4. Bot Owner専用コマンド 参照 |
+| 1  | `/setting` コマンドの実達（Embed + Select Menu + Modal） | Manus-Alpha | 🚧 進行中 | 要件定義書 16. /setting仕様 参照 |
+| 2  | `/coding` サブコマンドの拡充（panel, list, info, export, rename, delete） | Manus-Beta | ✅ 完了 | mainへ直接反映済み |
+| 3  | 管理者・オーナー用コマンドの実装（`/config`, `/health`, `/stats`, `/shutdown`） | Manus-Beta | ✅ 完了 | mainへ直接反映済み |
 | 4  | エラーハンドリングの強化 | 未定 | ⬜ 未着手 | より詳細なエラーメッセージ、ユーザーフレンドリーなエラー処理 |
 | 5  | テストコードの作成 | 未定 | ⬜ 未着手 | ユニットテスト、統合テスト |
 | 6  | 本番環境対応（Docker化など） | 未定 | ⬜ 未着手 | Dockerfile作成、デプロイメントガイド |
 | 7  | パフォーマンス最適化 | 未定 | ⬜ 未着手 | キャッシング機能、非同期処理の最適化 |
+| 8  | Prefix Command (!coding 等) の実装 | Manus-Beta | ✅ 完了 | mainへ直接反映済み |
 
 ## 4. 連絡事項
 
 - 不明点や疑問点があれば、GitHub Issues を活用してください。
 - 重要な決定事項は、GitHub Issues またはプルリクエストのコメントで議論し、記録を残してください。
-- この `TODO_COLLAB.md` ファイルも、必要に応じて更新してください。
+- この `TODO_COLLAB.md` ファイルも, 必要に応じて更新してください。
 
 ---
 
-**最終更新**: 2026-07-14 (Manus-Alpha)
+**最終更新**: 2026-07-14 (Manus-Beta)
