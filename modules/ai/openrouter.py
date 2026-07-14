@@ -31,8 +31,8 @@ class OpenRouterClient:
         model: str = Config.DEFAULT_AI_MODEL,
         temperature: float = 0.7,
         max_tokens: int = 2000,
-        stream: bool = False
-    ) -> AsyncGenerator[str, None] | Dict:
+        stream: bool = True
+    ):
         """
         Create a message using OpenRouter API
         
@@ -41,10 +41,10 @@ class OpenRouterClient:
             model: Model to use
             temperature: Temperature for sampling
             max_tokens: Maximum tokens in response
-            stream: Whether to stream the response
+            stream: Whether to stream the response (default: True)
         
-        Yields or Returns:
-            Streamed text chunks or complete response dict
+        Yields:
+            Streamed text chunks
         """
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -93,7 +93,8 @@ class OpenRouterClient:
                                         continue
                     else:
                         response_json = await response.json()
-                        return response_json
+                        # For non-streaming, yield the entire response as a single chunk
+                        yield str(response_json)
         
         except asyncio.TimeoutError:
             logger.error("OpenRouter API timeout")

@@ -27,15 +27,15 @@ class CodingCog(commands.Cog):
         self.session_manager = SessionManager(bot)
         self.ai_services = {}  # Cache for AI services per user
     
-    @commands.hybrid_command(name="coding", aliases=["code"])
+    @commands.command(name="coding", aliases=["code"])
     async def coding(self, ctx: commands.Context):
         """Base coding command"""
         await ctx.send(
-            "❓ Usage: `/coding start`, `/coding chat <message>`, `/coding end`\n"
-            "Use `/coding start` to begin a coding session."
+            "❓ Usage: `!coding start`, `!coding chat <message>`, `!coding end`\n"
+            "Use `!coding start` to begin a coding session."
         )
     
-    @coding.command(name="start")
+    @commands.command(name="start", parent="coding")
     @user_command
     async def coding_start(self, ctx: commands.Context, project_name: str = None):
         """
@@ -134,7 +134,7 @@ class CodingCog(commands.Cog):
             logger.error(f"Error in coding_start: {e}", exc_info=True)
             await ctx.followup.send(f"❌ Error starting session: {str(e)}")
     
-    @coding.command(name="chat")
+    @commands.command(name="chat")
     @user_command
     async def coding_chat(self, ctx: commands.Context, *, message: str):
         """
@@ -205,7 +205,7 @@ class CodingCog(commands.Cog):
             logger.error(f"Error in coding_chat: {e}", exc_info=True)
             await ctx.send(f"❌ Error: {str(e)}")
     
-    @coding.command(name="end")
+    @commands.command(name="end")
     @user_command
     async def coding_end(self, ctx: commands.Context):
         """

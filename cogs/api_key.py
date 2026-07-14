@@ -23,15 +23,15 @@ class APIKeyCog(commands.Cog):
         """
         self.bot = bot
     
-    @commands.hybrid_command(name="api-key")
+    @commands.command(name="api-key")
     async def api_key(self, ctx: commands.Context):
         """Base API key command"""
         await ctx.send(
             "🔑 API Key Management\n"
-            "Usage: `/api-key register`, `/api-key remove`"
+            "Usage: `!api-key register`, `!api-key remove`"
         )
     
-    @api_key.command(name="register")
+    @commands.command(name="register")
     @user_command
     async def api_key_register(self, ctx: commands.Context, api_key: str):
         """
@@ -93,7 +93,7 @@ class APIKeyCog(commands.Cog):
                 ephemeral=True
             )
     
-    @api_key.command(name="remove")
+    @commands.command(name="remove")
     @user_command
     async def api_key_remove(self, ctx: commands.Context):
         """
