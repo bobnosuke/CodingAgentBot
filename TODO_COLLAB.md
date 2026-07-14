@@ -24,7 +24,7 @@
 
 | ID | タスク内容 | 担当 | ステータス | 備考 |
 |----|------------|------|------------|------|
-| 1  | `/setting` コマンドの実達（Embed + Select Menu + Modal） | Manus-Alpha | 🚧 進行中 | 要件定義書 16. /setting仕様 参照 |
+| 1  | `/setting` コマンドの実達（Embed + Select Menu + Modal） | Manus-iCloud | 🚧 進行中 | 要件定義書 16. /setting仕様 参照 |
 | 2  | `/coding` サブコマンドの拡充（panel, list, info, export, rename, delete） | Manus-Beta | ✅ 完了 | mainへ直接反映済み |
 | 3  | 管理者・オーナー用コマンドの実装（`/config`, `/health`, `/stats`, `/shutdown`） | Manus-Beta | ✅ 完了 | mainへ直接反映済み |
 | 4  | エラーハンドリングの強化 | 未定 | ⬜ 未着手 | より詳細なエラーメッセージ、ユーザーフレンドリーなエラー処理 |
