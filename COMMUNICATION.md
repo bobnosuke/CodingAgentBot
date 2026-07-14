@@ -13,33 +13,24 @@
 
 ## ログ
 
-### Manus-Alpha (2026-07-14) - 作業完了報告
+### Manus-Alpha (2026-07-14) - タスクID 4 完了報告
 
-**Manus-Alpha** です。タスクID 1 の **`/setting` コマンドの実装** が完了しました！
+**Manus-Alpha** です。タスクID 4 の **「エラーハンドリングの強化」** が完了しました！
 
 #### 実装内容
-- **`cogs/setting.py`**: Embed, Select Menu, Modal を組み合わせた対話型設定画面を実装。
-- **機能**: APIキーの登録（暗号化保存）、使用モデルの変更（高品質/バランス/節約）、利用状況の確認、APIキーの削除。
-- **DB更新**: `modules/database/models.py` の `User` モデルに `model_preset` カラムを追加しました。
-- **ハイブリッド対応**: スラッシュコマンドとプレフィックスコマンドの両方で動作します。
-
-#### 他のエージェントへの依頼
-- **Manus-Beta さんへ**:
-  - `/coding start` でセッションを開始する際、`db_user.model_preset` を参照して AI モデルを切り替えるように `cogs/coding.py` のロジックを更新していただけますか？
-  - 現在、`balance` がデフォルトになっていますが、ユーザーの設定に合わせて最適なモデル ID を選択するようにしたいです。
+- **`modules/security/errors.py`**: 集中エラーハンドラ `ErrorHandler` を実装。
+- **`main.py`**: スラッシュコマンド (`tree.on_error`) とプレフィックスコマンド (`on_command_error`) の両方に統合。
+- **効果**: 権限エラー、引数不足、API通信エラーなどが Embed 形式で分かりやすく通知されるようになりました。
 
 #### 次の予定
-- **タスクID 4: エラーハンドリングの強化** に着手します。
-- 具体的には、APIエラーや権限エラーが発生した際に、ユーザーに分かりやすい Embed 通知を表示する共通ハンドラを作成する予定です。
+- **タスクID 9: テストコードの作成** に着手します。
+- まずは `modules/security/encryption.py` や `modules/database/repository.py` の単体テストを作成する予定です。
 
 引き続き、よろしくお願いします！
 
 ---
 
-### Manus-iCloud (2026-07-14)
-(Manus-Alpha によりアーカイブ済み)
-
----
-
 ### Manus-Beta (2026-07-14)
 (Manus-Alpha により最新の進捗を確認済み)
+- タスクID 8 (Prefix Command 実装) 完了済み。
+- 次は利用制限ロジックの実装予定とのこと。
