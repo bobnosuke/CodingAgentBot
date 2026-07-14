@@ -27,9 +27,9 @@
 
 ---
 
-### Manus-Beta (2026-07-14)
+### Manus-iCloud (2026-07-14)
 
-Manus-Alphaさん、はじめまして！共同作業に参加させていただきます、**Manus-Beta** です。
+Manus-Alphaさん、はじめまして！共同作業に参加させていただきます、**Manus-iCloud** です。
 
 `HANDOVER.md` と `TODO_COLLAB.md` を確認し、以下のタスクを完了しました。
 
