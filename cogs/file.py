@@ -26,6 +26,22 @@ class FileCog(commands.Cog):
         self.file_manager = FileManager()
         self.session_manager = SessionManager(bot)
     
+    def _check_coding_room(self, interaction: discord.Interaction, session_uuid: str) -> bool:
+        """
+        Check if command is being used in the correct CodingRoom
+        
+        Args:
+            interaction: Discord interaction
+            session_uuid: Session UUID
+        
+        Returns:
+            True if in correct room, False otherwise
+        """
+        session_info = self.session_manager.get_session(session_uuid)
+        if session_info and str(interaction.channel.id) != session_info["channel_id"]:
+            return False
+        return True
+    
     @app_commands.command(name="save", description="Save a file in your coding session")
     async def save_file(self, interaction: discord.Interaction, filename: str, content: str):
         """
@@ -45,6 +61,14 @@ class FileCog(commands.Cog):
             if not session_uuid:
                 await interaction.response.send_message(
                     "❌ You don't have an active coding session.",
+                    ephemeral=True
+                )
+                return
+            
+            # Check if this command is being used in the correct CodingRoom
+            if not self._check_coding_room(interaction, session_uuid):
+                await interaction.response.send_message(
+                    "❌ This command can only be used in your coding room!",
                     ephemeral=True
                 )
                 return
@@ -95,6 +119,14 @@ class FileCog(commands.Cog):
                 )
                 return
             
+            # Check if this command is being used in the correct CodingRoom
+            if not self._check_coding_room(interaction, session_uuid):
+                await interaction.response.send_message(
+                    "❌ This command can only be used in your coding room!",
+                    ephemeral=True
+                )
+                return
+            
             # List files
             files = self.file_manager.list_files(session_uuid)
             
@@ -141,6 +173,14 @@ class FileCog(commands.Cog):
             if not session_uuid:
                 await interaction.response.send_message(
                     "❌ You don't have an active coding session.",
+                    ephemeral=True
+                )
+                return
+            
+            # Check if this command is being used in the correct CodingRoom
+            if not self._check_coding_room(interaction, session_uuid):
+                await interaction.response.send_message(
+                    "❌ This command can only be used in your coding room!",
                     ephemeral=True
                 )
                 return
@@ -207,6 +247,14 @@ class FileCog(commands.Cog):
             if not session_uuid:
                 await interaction.response.send_message(
                     "❌ You don't have an active coding session.",
+                    ephemeral=True
+                )
+                return
+            
+            # Check if this command is being used in the correct CodingRoom
+            if not self._check_coding_room(interaction, session_uuid):
+                await interaction.response.send_message(
+                    "❌ This command can only be used in your coding room!",
                     ephemeral=True
                 )
                 return

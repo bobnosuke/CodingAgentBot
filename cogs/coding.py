@@ -53,7 +53,7 @@ class CodingCog(commands.Cog):
                 return
             
             # Defer response as this may take a while
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             
             # Get database session
             db_session = self.bot.db_manager.get_session()
@@ -73,14 +73,15 @@ class CodingCog(commands.Cog):
                 if not api_key:
                     await interaction.followup.send(
                         "❌ No OpenRouter API key found!\n"
-                        "Please register your API key first using `/api-key register`"
+                        "Please register your API key first using `/api-key register`",
+                        ephemeral=True
                     )
                     return
                 
                 # Decrypt API key
                 decrypted_key = self.bot.encryption_manager.decrypt(api_key.encrypted_key)
                 
-                # Create session
+                # Create session and CodingRoom
                 session_uuid, coding_room = await self.session_manager.create_session(
                     db_session,
                     interaction.user,
@@ -92,10 +93,10 @@ class CodingCog(commands.Cog):
                 openrouter_client = OpenRouterClient(decrypted_key)
                 self.ai_services[user_id] = AIService(openrouter_client)
                 
-                # Send success message
+                # Send success message (ephemeral - only visible to user)
                 embed = discord.Embed(
                     title="✅ Coding Session Started",
-                    description=f"Your coding room is ready!",
+                    description=f"Your private coding room has been created!",
                     color=discord.Color.green()
                 )
                 embed.add_field(name="Session ID", value=f"`{session_uuid[:8]}`", inline=False)
@@ -104,11 +105,18 @@ class CodingCog(commands.Cog):
                 if project_name:
                     embed.add_field(name="Project", value=project_name, inline=False)
                 
-                embed.set_footer(text="Use /coding chat to start coding!")
+                embed.add_field(
+                    name="Next Steps",
+                    value="1. Go to your coding room\n"
+                          "2. Use `/coding chat` to start coding with AI\n"
+                          "3. Use `/coding end` when done",
+                    inline=False
+                )
+                embed.set_footer(text="Your coding room is private - only you, the bot, and admins can see it")
                 
-                await interaction.followup.send(embed=embed)
+                await interaction.followup.send(embed=embed, ephemeral=True)
                 
-                # Send welcome message in coding room
+                # Send welcome message in coding room (visible to everyone with access)
                 welcome_embed = discord.Embed(
                     title="🤖 Welcome to your Coding Session",
                     description="I'm your AI coding assistant. Tell me what you'd like to build!",
@@ -116,18 +124,33 @@ class CodingCog(commands.Cog):
                 )
                 welcome_embed.add_field(
                     name="Examples",
-                    value="• Create a Discord bot\n• Build a web scraper\n• Fix this code\n• Explain this concept",
+                    value="• `/coding chat Create a Discord bot`\n"
+                          "• `/coding chat Add login functionality`\n"
+                          "• `/coding chat Fix this code: ...`\n"
+                          "• `/coding chat Explain how decorators work`",
+                    inline=False
+                )
+                welcome_embed.add_field(
+                    name="Tips",
+                    value="• Use `/save` to save generated code\n"
+                          "• Use `/list` to see all saved files\n"
+                          "• Use `/download` to download all files as ZIP",
                     inline=False
                 )
                 
                 await coding_room.send(embed=welcome_embed)
+                
+                logger.info(f"Created session {session_uuid} for {interaction.user.name}")
             
             finally:
                 await db_session.close()
         
         except Exception as e:
             logger.error(f"Error in coding_start: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ Error starting session: {str(e)}")
+            await interaction.followup.send(
+                f"❌ Error starting session: {str(e)}",
+                ephemeral=True
+            )
     
     @coding_group.command(name="chat", description="Chat with AI in your coding session")
     async def coding_chat(self, interaction: discord.Interaction, message: str):
@@ -147,6 +170,16 @@ class CodingCog(commands.Cog):
             if not session_uuid:
                 await interaction.response.send_message(
                     "❌ You don't have an active coding session. Use `/coding start` first.",
+                    ephemeral=True
+                )
+                return
+            
+            # Check if this command is being used in the correct CodingRoom
+            session_info = self.session_manager.get_session(session_uuid)
+            
+            if session_info and str(interaction.channel.id) != session_info["channel_id"]:
+                await interaction.response.send_message(
+                    "❌ This command can only be used in your coding room!",
                     ephemeral=True
                 )
                 return
@@ -226,7 +259,7 @@ class CodingCog(commands.Cog):
                 )
                 return
             
-            await interaction.response.defer()
+            await interaction.response.defer(ephemeral=True)
             
             # Get database session
             db_session = self.bot.db_manager.get_session()
@@ -247,15 +280,21 @@ class CodingCog(commands.Cog):
                 
                 await interaction.followup.send(
                     f"✅ Session `{session_uuid[:8]}` closed.\n"
-                    f"Your coding room has been deleted."
+                    f"Your coding room has been deleted.",
+                    ephemeral=True
                 )
+                
+                logger.info(f"Closed session {session_uuid} for {interaction.user.name}")
             
             finally:
                 await db_session.close()
         
         except Exception as e:
             logger.error(f"Error in coding_end: {e}", exc_info=True)
-            await interaction.response.send_message(f"❌ Error closing session: {str(e)}", ephemeral=True)
+            await interaction.response.send_message(
+                f"❌ Error closing session: {str(e)}",
+                ephemeral=True
+            )
 
 
 async def setup(bot: commands.Bot):
