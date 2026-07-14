@@ -6,7 +6,7 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete
 from logger import setup_logger
-from .models import User, APIKey, Session, Message, Project, UsageLog, SystemLog
+from .models import User, APIKey, Session, Message, Project, UsageLog, SystemLog, Guild
 
 logger = setup_logger(__name__)
 
@@ -57,6 +57,19 @@ class UserRepository:
             return result.scalar_one_or_none()
         except Exception as e:
             logger.error(f"Error in get_user_by_discord_id: {e}")
+            raise
+
+    @staticmethod
+    async def update_model_preset(session: AsyncSession, user_id: int, preset: str) -> None:
+        """Update user's model preset"""
+        try:
+            stmt = update(User).where(User.id == user_id).values(model_preset=preset)
+            await session.execute(stmt)
+            await session.commit()
+            logger.info(f"Updated model preset to {preset} for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error in update_model_preset: {e}")
+            await session.rollback()
             raise
 
 
@@ -116,6 +129,19 @@ class APIKeyRepository:
         
         except Exception as e:
             logger.error(f"Error in update_last_used: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def delete_user_keys(session: AsyncSession, user_id: int) -> None:
+        """Deactivate all API keys for a user"""
+        try:
+            stmt = update(APIKey).where(APIKey.user_id == user_id).values(is_active=False)
+            await session.execute(stmt)
+            await session.commit()
+            logger.info(f"Deactivated all API keys for user {user_id}")
+        except Exception as e:
+            logger.error(f"Error in delete_user_keys: {e}")
             await session.rollback()
             raise
 
@@ -256,4 +282,90 @@ class SystemLogRepository:
         except Exception as e:
             logger.error(f"Error in log_event: {e}")
             await session.rollback()
+            raise
+
+
+class GuildRepository:
+    """Repository for Guild operations"""
+    
+    @staticmethod
+    async def get_or_create_guild(session: AsyncSession, guild_id: str, owner_id: str) -> Guild:
+        """Get existing guild or create new one"""
+        try:
+            stmt = select(Guild).where(Guild.guild_id == guild_id)
+            result = await session.execute(stmt)
+            guild = result.scalar_one_or_none()
+            
+            if guild:
+                return guild
+            
+            guild = Guild(guild_id=guild_id, owner_id=owner_id)
+            session.add(guild)
+            await session.commit()
+            return guild
+        except Exception as e:
+            logger.error(f"Error in get_or_create_guild: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def update_config(session: AsyncSession, guild_id: str, **kwargs) -> None:
+        """Update guild configuration"""
+        try:
+            stmt = update(Guild).where(Guild.guild_id == guild_id).values(**kwargs)
+            await session.execute(stmt)
+            await session.commit()
+        except Exception as e:
+            logger.error(f"Error in update_guild_config: {e}")
+            await session.rollback()
+            raise
+
+class UsageLogRepository:
+    """Repository for UsageLog operations"""
+    
+    @staticmethod
+    async def add_usage(
+        session: AsyncSession,
+        user_id: int,
+        model: str,
+        token_input: int = 0,
+        token_output: int = 0,
+        estimated_cost: float = 0.0
+    ) -> UsageLog:
+        """Add usage log"""
+        try:
+            usage = UsageLog(
+                user_id=user_id,
+                model=model,
+                token_input=token_input,
+                token_output=token_output,
+                estimated_cost=estimated_cost
+            )
+            session.add(usage)
+            await session.commit()
+            return usage
+        except Exception as e:
+            logger.error(f"Error in add_usage: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_daily_usage_count(session: AsyncSession, user_id: int) -> int:
+        """Get number of messages sent by user today"""
+        try:
+            from sqlalchemy import func
+            from datetime import datetime, time
+            
+            today_start = datetime.combine(datetime.utcnow().date(), time.min)
+            
+            # Count entries in UsageLog for this user today
+            # (Assuming each UsageLog entry corresponds to one AI response/message)
+            stmt = select(func.count(UsageLog.id)).where(
+                (UsageLog.user_id == user_id) & 
+                (UsageLog.created_at >= today_start)
+            )
+            result = await session.execute(stmt)
+            return result.scalar() or 0
+        except Exception as e:
+            logger.error(f"Error in get_daily_usage_count: {e}")
             raise

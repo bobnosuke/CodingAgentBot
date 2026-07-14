@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from logger import setup_logger
-from modules.database.repository import UserRepository, APIKeyRepository
+from modules.database.repository import UserRepository, APIKeyRepository, UsageLogRepository
 from modules.security.permissions import user_command
 
 logger = setup_logger(__name__)
@@ -48,24 +48,14 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter APIキーの登録"):
             # Encrypt API key
             encrypted_key = self.bot.encryption_manager.encrypt(str(self.api_key))
             
-            # Check for existing key
-            existing_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
-            
-            if existing_key:
-                # Update existing (In this simple repo, we just create a new one for now)
-                await APIKeyRepository.create_api_key(
-                    db_session,
-                    user.id,
-                    encrypted_key,
-                    "OpenRouter"
-                )
-            else:
-                await APIKeyRepository.create_api_key(
-                    db_session,
-                    user.id,
-                    encrypted_key,
-                    "OpenRouter"
-                )
+            # Deactivate old keys and add new one
+            await APIKeyRepository.delete_user_keys(db_session, user.id)
+            await APIKeyRepository.create_api_key(
+                db_session,
+                user.id,
+                encrypted_key,
+                "OpenRouter"
+            )
             
             await interaction.followup.send("✅ APIキーを登録しました。", ephemeral=True)
             
@@ -125,7 +115,6 @@ class SettingSelect(discord.ui.Select):
             await self._handle_delete_key(interaction)
             
         elif value == "change_model":
-            # Model change sub-menu
             view = discord.ui.View()
             view.add_item(ModelSelect(self.bot))
             await interaction.response.send_message(
@@ -146,9 +135,8 @@ class SettingSelect(discord.ui.Select):
                 await interaction.followup.send("❌ ユーザーが見つかりません。", ephemeral=True)
                 return
                 
-            # Actually delete/deactivate key (Simplified: just inform in this repo's current state)
-            # In a full implementation, we'd update the DB record
-            await interaction.followup.send("✅ APIキーを削除しました（※デモ動作）", ephemeral=True)
+            await APIKeyRepository.delete_user_keys(db_session, user.id)
+            await interaction.followup.send("✅ APIキーを削除しました。", ephemeral=True)
             
             cog = self.bot.get_cog("SettingCog")
             if cog:
@@ -157,11 +145,25 @@ class SettingSelect(discord.ui.Select):
             await db_session.close()
 
     async def _handle_usage(self, interaction: discord.Interaction):
-        # Placeholder usage info
-        embed = discord.Embed(title="📊 利用状況", color=discord.Color.blue())
-        embed.add_field(name="本日の利用回数", value="0 / 50", inline=True)
-        embed.add_field(name="残り利用回数", value="50", inline=True)
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        db_session = self.bot.db_manager.get_session()
+        try:
+            user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
+            if not user:
+                await interaction.followup.send("❌ ユーザーが見つかりません。", ephemeral=True)
+                return
+                
+            count = await UsageLogRepository.get_daily_usage_count(db_session, user.id)
+            limit = 50
+            
+            embed = discord.Embed(title="📊 本日の利用状況", color=discord.Color.blue())
+            embed.add_field(name="利用回数", value=f"{count} / {limit}", inline=True)
+            embed.add_field(name="残り回数", value=f"{max(0, limit - count)}", inline=True)
+            embed.set_footer(text="毎日 0:00 (UTC) にリセットされます")
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        finally:
+            await db_session.close()
 
 
 class ModelSelect(discord.ui.Select):
@@ -177,14 +179,28 @@ class ModelSelect(discord.ui.Select):
         self.bot = bot
 
     async def callback(self, interaction: discord.Interaction):
-        # In a real app, update User.model_preset in DB
-        await interaction.response.send_message(
-            f"✅ モデルを **{self.values[0]}** に変更しました（※デモ動作）",
-            ephemeral=True
-        )
-        cog = self.bot.get_cog("SettingCog")
-        if cog:
-            await cog.update_setting_message(interaction)
+        await interaction.response.defer(ephemeral=True)
+        db_session = self.bot.db_manager.get_session()
+        try:
+            user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
+            if not user:
+                await interaction.followup.send("❌ ユーザーが見つかりません。", ephemeral=True)
+                return
+            
+            preset = self.values[0]
+            await UserRepository.update_model_preset(db_session, user.id, preset)
+            
+            labels = {"high": "高品質", "balance": "バランス", "budget": "節約"}
+            await interaction.followup.send(
+                f"✅ モデルを **{labels.get(preset, preset)}** に変更しました。",
+                ephemeral=True
+            )
+            
+            cog = self.bot.get_cog("SettingCog")
+            if cog:
+                await cog.update_setting_message(interaction)
+        finally:
+            await db_session.close()
 
 
 class SettingView(discord.ui.View):
@@ -219,7 +235,7 @@ class SettingCog(commands.Cog):
         """Create the setting status embed"""
         db_session = self.bot.db_manager.get_session()
         api_status = "❌ 未登録"
-        model_preset = "⚖️ バランス（推奨）" # Default
+        model_preset_label = "⚖️ バランス（推奨）"
         
         try:
             db_user = await UserRepository.get_user_by_discord_id(db_session, str(user.id))
@@ -227,7 +243,13 @@ class SettingCog(commands.Cog):
                 key = await APIKeyRepository.get_active_api_key(db_session, db_user.id)
                 if key:
                     api_status = "✅ 登録済み"
-                # model_preset = db_user.model_preset or model_preset # If field existed
+                
+                presets = {
+                    "high": "🚀 高品質",
+                    "balance": "⚖️ バランス（推奨）",
+                    "budget": "💰 節約"
+                }
+                model_preset_label = presets.get(db_user.model_preset, model_preset_label)
         finally:
             await db_session.close()
 
@@ -237,7 +259,7 @@ class SettingCog(commands.Cog):
             color=discord.Color.blue()
         )
         embed.add_field(name="OpenRouter APIキー", value=api_status, inline=True)
-        embed.add_field(name="使用モデル", value=model_preset, inline=True)
+        embed.add_field(name="使用モデル", value=model_preset_label, inline=True)
         embed.set_footer(text="下のメニューから設定を変更できます。")
         return embed
 
@@ -245,12 +267,14 @@ class SettingCog(commands.Cog):
         """Update the existing setting message embed"""
         embed = await self._create_setting_embed(interaction.user)
         try:
-            if interaction.response.is_done():
+            # Check if it's an interaction from a button/select or the original command
+            if hasattr(interaction, "message") and interaction.message:
                 await interaction.edit_original_response(embed=embed, view=SettingView(self.bot))
             else:
-                await interaction.response.edit_message(embed=embed, view=SettingView(self.bot))
-        except Exception:
-            pass
+                # If we're calling this from somewhere else
+                pass
+        except Exception as e:
+            logger.error(f"Error updating setting message: {e}")
 
 
 async def setup(bot: commands.Bot):

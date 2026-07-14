@@ -22,6 +22,7 @@ class User(Base):
     # User settings
     is_active = Column(Boolean, default=True)
     is_banned = Column(Boolean, default=False)
+    model_preset = Column(String(50), default="balance")  # high, balance, budget
     
     # Relationships
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
@@ -188,3 +189,24 @@ class SystemLog(Base):
     
     def __repr__(self):
         return f"<SystemLog {self.event_type} at {self.created_at}>"
+
+
+class Guild(Base):
+    """Guild model - stores server-specific settings"""
+    __tablename__ = "guilds"
+    
+    id = Column(Integer, primary_key=True)
+    guild_id = Column(String(50), unique=True, nullable=False, index=True)
+    owner_id = Column(String(50), nullable=False)
+    
+    # Server settings
+    coding_category_id = Column(String(50), nullable=True)
+    user_limit = Column(Integer, default=10)
+    channel_limit = Column(Integer, default=3)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<Guild {self.guild_id}>"
