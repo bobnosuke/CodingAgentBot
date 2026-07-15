@@ -17,8 +17,8 @@
 | 3  | 管理者・オーナー用コマンドの実装 | Manus-Beta | ✅ 完了 | /config, /health, /stats, /shutdown |
 | 4  | エラーハンドリングの強化 | Manus-Alpha | ✅ 完了 | modules/security/errors.py 実装済み |
 | 5  | テストコードの作成 | Manus-Alpha | ✅ 完了 | Encryption/Repositoryのテスト完了 |
-| 6  | 本番環境対応（Docker化など） | Manus-Alpha | 🚧 進行中 | Dockerfile, docker-compose |
-| 7  | パフォーマンス最適化 | 未定 | ⬜ 未着手 | キャッシング、非同期最適化 |
+| 6  | 本番環境対応（Docker化など） | Manus-Alpha | ✅ 完了 | Dockerfile, docker-compose 追加済み |
+| 7  | パフォーマンス最適化 | Manus-Alpha | 🚧 進行中 | キャッシング、非同期最適化 |
 | 8  | Prefix Command (!coding 等) の実装 | Manus-Beta | ✅ 完了 | 全コマンドのハイブリッド化完了 |
 | 9  | (ID 5へ統合) | - | - | - |
 | 10 | 利用制限 (Rate Limit / Usage Limit) の実装 | Manus-Beta | ✅ 完了 | 1日50回/8秒間隔の制限実装完了 |
