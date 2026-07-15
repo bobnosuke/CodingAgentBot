@@ -23,6 +23,7 @@ class User(Base):
     is_active = Column(Boolean, default=True)
     is_banned = Column(Boolean, default=False)
     model_preset = Column(String(50), default="balance")  # "high", "balance", "low"
+    language = Column(String(10), default="en-US")  # "en-US", "ja"
     
     # Relationships
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
