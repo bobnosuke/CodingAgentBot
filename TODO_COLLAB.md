@@ -1,28 +1,23 @@
-# 📝 CoderAgent 共同作業タスクリスト
+# 🤝 CoderAgent 共同作業タスクリスト
 
 このファイルは、CoderAgent プロジェクトにおける共同作業のタスク管理に使用します。
 
-## 1. 共同作業フロー
+## 📝 コミュニケーションルール
+- 各エージェントは独自の名前（例: Manus-Alpha, Manus-Beta）でコミュニケーションログに記載すること。
+- 作業開始前には必ず `git pull origin main` で最新のコードを取得し、`TODO_COLLAB.md` と `COMMUNICATION.md` を確認すること。
+- 自身の担当タスクのステータスを更新すること。
+- `COMMUNICATION.md` が長大になることを避けるため、自身の記述が一定量に達したら、その部分を削除して新しい記述を開始すること。
+- 要件定義書は `docs/` フォルダに格納されており、常に最新版を参照すること。
 
-1.  **作業開始前**: `git pull origin main` で最新のコードを取得し、この `TODO_COLLAB.md` を確認して担当タスクを把握します。
-2.  **実装とプッシュ**: 実装が完了したら、直接 `main` ブランチにプッシュしてください（競合を避けるため、プッシュ前に必ず pull を行ってください）。
-3.  **タスク更新**: 自身の担当タスクのステータスを更新し、完了したタスクは `✅` に変更します。
+## 📋 タスクリスト (最新コマンド仕様に基づく)
 
-## 2. タスクリスト
-
-| ID | タスク内容 | 担当 | ステータス | 備考 |
-|----|------------|------|------------|------|
-| 1  | `/setting` コマンドの実装 | Manus-Alpha | ✅ 完了 | Embed/Modal/UsageLog連携完了 |
-| 2  | `/coding` サブコマンドの拡充 | Manus-Beta | ✅ 完了 | panel, list, info, export, rename, delete |
-| 3  | 管理者・オーナー用コマンドの実装 | Manus-Beta | ✅ 完了 | /config, /health, /stats, /shutdown |
-| 4  | エラーハンドリングの強化 | Manus-Alpha | ✅ 完了 | modules/security/errors.py 実装済み |
-| 5  | テストコードの作成 | Manus-Alpha | ✅ 完了 | Encryption/Repositoryのテスト完了 |
-| 6  | 本番環境対応（Docker化など） | Manus-Alpha | ✅ 完了 | Dockerfile, docker-compose 追加済み |
-| 7  | パフォーマンス最適化 | Manus-Alpha | 🚧 進行中 | キャッシング、非同期最適化 |
-| 8  | Prefix Command (!coding 等) の実装 | Manus-Beta | ✅ 完了 | 全コマンドのハイブリッド化完了 |
-| 9  | (ID 5へ統合) | - | - | - |
-| 10 | 利用制限 (Rate Limit / Usage Limit) の実装 | Manus-Beta | ✅ 完了 | 1日50回/8秒間隔の制限実装完了 |
-| 11 | サーバー設定 (Guild Settings) の永続化 | Manus-iCloud | ⬜ 未着手 | /config の DB 連携 |
-
----
-**最終更新**: 2026-07-14 (Manus-Alpha)
+| タスクID | 内容 | 担当 | ステータス | 備考 |
+|:---|:---|:---|:---|:---|
+| 1 | `/coding` コマンドの刷新 (panel, server) | Manus-Beta | ⬜ 未着手 | `panel` は開発開始、プロジェクト一覧、詳細確認、プロジェクト名変更を統合。`server` は利用状況表示。 | 
+| 2 | `/setting` コマンドの刷新 (Embed + Select Menu + Modal) | Manus-Alpha | 🚧 進行中 | `/setting` は設定表示パネル、`!setting` は直接設定パネルを表示。APIキー登録/削除、モデル選択、利用状況確認を統合。 | 
+| 3 | `/guide` コマンドのページ送り機能実装 | Manus-Beta | ⬜ 未着手 | Embed パネルでページ送りボタンを実装。 | 
+| 4 | CodingRoom 内の自動応答実装と `/coding chat` の削除 | Manus-Alpha | ⬜ 未着手 | `!` 以外のユーザー発言を AI との会話と認識。`/coding chat` を削除。 | 
+| 5 | CodingRoom 内コマンド (!list, !get, !download, !close, !readme) の実装と修正 | Manus-Beta | ⬜ 未着手 | `!list` は階層表示、`!get` は Select Menu、`!download` は複数選択と「全てダウンロード」ボタン、`!close` は確認ボタン、`!readme` はプロジェクト README 表示。 | 
+| 6 | `/config` コマンドの刷新 (Embed パネル) | Manus-Beta | ⬜ 未着手 | カテゴリ、同時チャンネル数、利用人数制限を設定可能。 | 
+| 7 | 管理者・オーナー用コマンドの刷新 (/health, /stats, /shutdown) | Manus-Alpha | ⬜ 未着手 | `/health` は Embed パネル、`/stats` はグラフ表示、`/shutdown` は安全停止。 | 
+| 8 | 最終動作確認と GitHub への最終同期 | 全員 | ⬜ 未着手 | プロジェクト全体の最終確認。 | 
