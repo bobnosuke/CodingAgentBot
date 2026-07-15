@@ -256,8 +256,12 @@ class SettingCog(commands.Cog):
         self.bot = bot
     
     @app_commands.command(
-        name=app_commands.locale_str("COMMAND.SETTING.NAME"), 
-        description=app_commands.locale_str("COMMAND.SETTING.DESC")
+        name="setting", 
+        description="Configure bot settings"
+    )
+    @app_commands.describe(
+        # We can't use locale_str in name/description of command itself easily without causing validation errors,
+        # but the Translator will handle the name "setting" and its description automatically.
     )
     async def setting(self, interaction: discord.Interaction):
         """Show User Settings Panel (Public Start Button)"""

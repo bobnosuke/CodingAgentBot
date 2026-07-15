@@ -136,8 +136,8 @@ class CodingCog(commands.Cog):
         self.session_manager = SessionManager(bot)
     
     coding_group = app_commands.Group(
-        name=app_commands.locale_str("COMMAND.CODING.NAME"), 
-        description=app_commands.locale_str("COMMAND.CODING.DESC")
+        name="coding", 
+        description="AI Coding related commands"
     )
     
     @commands.Cog.listener()
@@ -227,8 +227,8 @@ class CodingCog(commands.Cog):
                 await db_session.close()
 
     @coding_group.command(
-        name=app_commands.locale_str("COMMAND.CODING.PANEL_NAME"), 
-        description=app_commands.locale_str("COMMAND.CODING.PANEL_DESC")
+        name="panel", 
+        description="Show coding management panel"
     )
     async def coding_panel(self, interaction: discord.Interaction):
         """Show Public Panel"""
@@ -261,8 +261,8 @@ class CodingCog(commands.Cog):
             await db_session.close()
     
     @coding_group.command(
-        name=app_commands.locale_str("COMMAND.CODING.START_NAME"), 
-        description=app_commands.locale_str("COMMAND.CODING.START_DESC")
+        name="start", 
+        description="Start a new coding session"
     )
     async def coding_start(self, interaction: discord.Interaction, project_name: str = None):
         """Start Session (New Ephemeral)"""
@@ -309,8 +309,8 @@ class CodingCog(commands.Cog):
             await db_session.close()
 
     @coding_group.command(
-        name=app_commands.locale_str("COMMAND.CODING.END_NAME"), 
-        description=app_commands.locale_str("COMMAND.CODING.END_DESC")
+        name="end", 
+        description="End current coding session"
     )
     async def coding_end(self, interaction: discord.Interaction):
         """End Session (New Ephemeral Confirmation)"""

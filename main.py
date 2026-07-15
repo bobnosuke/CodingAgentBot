@@ -5,8 +5,8 @@ import os
 import asyncio
 from dotenv import load_dotenv
 from logger import setup_logger
-from modules.database.manager import DatabaseManager
-from modules.encryption.manager import EncryptionManager
+from modules.database.database import DatabaseManager
+from modules.security.encryption import EncryptionManager
 from modules.utils.i18n import i18n, CommandTranslator
 
 # Load environment variables
@@ -27,7 +27,9 @@ class CoderAgent(commands.Bot):
         )
         
         self.db_manager = DatabaseManager()
-        self.encryption_manager = EncryptionManager()
+        # Initialize encryption manager with key from environment
+        master_key = os.getenv("ENCRYPTION_KEY")
+        self.encryption_manager = EncryptionManager(master_key)
 
     async def setup_hook(self):
         logger.info("Setting up bot hooks...")
@@ -35,10 +37,6 @@ class CoderAgent(commands.Bot):
         # Initialize database
         await self.db_manager.initialize()
         logger.info("✅ Database initialized")
-        
-        # Initialize encryption
-        self.encryption_manager.initialize()
-        logger.info("✅ Encryption manager initialized")
         
         # Register Translator
         await self.tree.set_translator(CommandTranslator())
