@@ -391,8 +391,9 @@ class SettingCog(commands.Cog):
     @PermissionManager.has_permission(PermissionLevel.USER)
     async def setting_slash(self, interaction: discord.Interaction):
         """Show the setting menu via slash command"""
-        await interaction.response.defer(ephemeral=True)
-        await self._send_setting_panel(interaction, interaction.user, ephemeral=True)
+        # ephemeral=False に変更して設定開始パネルを公開する
+        await interaction.response.defer(ephemeral=False)
+        await self._send_setting_panel(interaction, interaction.user, ephemeral=False)
 
     @commands.command(name="setting", description="設定画面を直接表示します")
     async def setting_prefix(self, ctx: commands.Context):

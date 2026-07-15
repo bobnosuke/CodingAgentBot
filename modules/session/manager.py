@@ -46,9 +46,6 @@ class SessionManager:
             Tuple of (session_uuid, coding_room_channel)
         """
         try:
-            # Generate session UUID
-            session_uuid = str(uuid.uuid4())
-            
             # Get or create user in database
             user = await UserRepository.get_or_create_user(
                 db_session,
@@ -56,11 +53,15 @@ class SessionManager:
                 discord_user.name,
                 discord_user.discriminator
             )
+
+            # Generate session UUID (userID-shortUUID)
+            short_uuid = str(uuid.uuid4())[:8]
+            session_uuid = f"{discord_user.id}-{short_uuid}"
             
             # Get user's session count for naming
             user_session_count = await SessionRepository.count_user_sessions(db_session, user.id)
             session_num = str(user_session_count + 1).zfill(4)
-            default_name = f"{discord_user.name}-{session_num}"
+            default_name = f"{discord_user.id}-{session_num}"
             
             # Create CodingRoom channel
             coding_room = await self._create_coding_room(
