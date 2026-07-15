@@ -143,12 +143,28 @@ class AIService:
             openrouter_client: OpenRouter client instance
         """
         self.client = openrouter_client
+        self.current_model = Config.DEFAULT_AI_MODEL
     
+    def set_model_by_preset(self, preset: str):
+        """
+        Set AI model based on preset name
+        
+        Args:
+            preset: Preset name ('high', 'balance', 'low')
+        """
+        presets = {
+            "high": "anthropic/claude-3.5-sonnet",
+            "balance": "google/gemini-pro-1.5",
+            "low": "meta-llama/llama-3.1-70b-instruct"
+        }
+        self.current_model = presets.get(preset, Config.DEFAULT_AI_MODEL)
+        logger.info(f"AI model set to {self.current_model} via preset {preset}")
+
     async def generate_code(
         self,
         user_prompt: str,
         conversation_history: List[Dict[str, str]] = None,
-        model: str = Config.DEFAULT_AI_MODEL
+        model: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         Generate code based on user prompt
@@ -156,7 +172,7 @@ class AIService:
         Args:
             user_prompt: User's code generation request
             conversation_history: Previous messages in conversation
-            model: Model to use
+            model: Model to use (overrides self.current_model)
         
         Yields:
             Code chunks as they're generated
@@ -192,7 +208,7 @@ When generating code:
         # Stream response
         async for chunk in self.client.create_message(
             messages=messages,
-            model=model,
+            model=model or self.current_model,
             temperature=0.7,
             max_tokens=4000,
             stream=True
@@ -203,7 +219,7 @@ When generating code:
         self,
         user_message: str,
         conversation_history: List[Dict[str, str]] = None,
-        model: str = Config.DEFAULT_AI_MODEL
+        model: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         Chat with AI assistant
@@ -211,7 +227,7 @@ When generating code:
         Args:
             user_message: User's message
             conversation_history: Previous messages
-            model: Model to use
+            model: Model to use (overrides self.current_model)
         
         Yields:
             Response chunks
@@ -240,7 +256,7 @@ Be concise, clear, and practical in your responses."""
         
         async for chunk in self.client.create_message(
             messages=messages,
-            model=model,
+            model=model or self.current_model,
             temperature=0.7,
             max_tokens=2000,
             stream=True
