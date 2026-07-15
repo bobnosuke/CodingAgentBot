@@ -18,12 +18,12 @@ logger = setup_logger(__name__)
 class FileSelectView(discord.ui.View):
     """View for file selection with multi-select"""
     
-    def __init__(self, files: list, session_uuid: str, file_manager: FileManager):
+    def __init__(self, files: list, session_uuid: str, file_manager: FileManager, user_id: int):
         super().__init__(timeout=300)
         self.files = files
         self.session_uuid = session_uuid
         self.file_manager = file_manager
-        self.selected_files = []
+        self.user_id = user_id
         
         # Create select menu with file options
         options = [
@@ -34,7 +34,8 @@ class FileSelectView(discord.ui.View):
         select = discord.ui.Select(
             placeholder="ダウンロードするファイルを選択してください",
             options=options,
-            max_values=len(files)
+            max_values=len(files),
+            custom_id="file_select"
         )
         select.callback = self.select_callback
         self.add_item(select)
@@ -43,14 +44,49 @@ class FileSelectView(discord.ui.View):
         download_all_btn = discord.ui.Button(label="全てダウンロード", style=discord.ButtonStyle.green, emoji="⬇️")
         download_all_btn.callback = self.download_all_callback
         self.add_item(download_all_btn)
-    
+
+    async def _send_zip(self, interaction: discord.Interaction, selected_files: list):
+        """Helper to create and send ZIP file"""
+        if not selected_files:
+            await interaction.followup.send("❌ ファイルが選択されていません。", ephemeral=True)
+            return
+
+        try:
+            zip_buffer = io.BytesIO()
+            session_dir = self.file_manager.base_storage_dir / self.session_uuid
+            
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for file in selected_files:
+                    file_path = session_dir / file
+                    if file_path.exists():
+                        zip_file.write(file_path, arcname=file)
+            
+            zip_buffer.seek(0)
+            await interaction.followup.send(
+                content=f"✅ {len(selected_files)}個のファイルをZIPで送信します。",
+                file=discord.File(zip_buffer, filename=f"session_{self.session_uuid[:8]}.zip"),
+                ephemeral=True
+            )
+        except Exception as e:
+            logger.error(f"Error creating ZIP in FileSelectView: {e}")
+            await interaction.followup.send(f"❌ ZIP作成中にエラーが発生しました: {str(e)}", ephemeral=True)
+
     async def select_callback(self, interaction: discord.Interaction):
-        self.selected_files = interaction.data["values"]
-        await interaction.response.defer()
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
+            return
+            
+        selected_files = interaction.data["values"]
+        await interaction.response.defer(ephemeral=True)
+        await self._send_zip(interaction, selected_files)
     
     async def download_all_callback(self, interaction: discord.Interaction):
-        self.selected_files = self.files
-        await interaction.response.defer()
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        await self._send_zip(interaction, self.files)
 
 
 class FileCog(commands.Cog):
@@ -83,7 +119,7 @@ class FileCog(commands.Cog):
             return False
         return True
     
-    @commands.command(name="list", description="List all files in your coding session")
+    @commands.command(name="list", description="セッション内のファイル一覧を表示します")
     async def list_files(self, ctx: commands.Context):
         """
         List all files in the current session
@@ -138,7 +174,7 @@ class FileCog(commands.Cog):
             logger.error(f"Error in list_files: {e}", exc_info=True)
             await ctx.send(f"❌ Error listing files: {str(e)}")
     
-    @commands.command(name="get", description="Get file content")
+    @commands.command(name="get", description="ファイルの内容を取得します")
     async def get_file(self, ctx: commands.Context, filename: str):
         """
         Get file content
@@ -190,7 +226,7 @@ class FileCog(commands.Cog):
             logger.error(f"Error in get_file: {e}", exc_info=True)
             await ctx.send(f"❌ Error retrieving file: {str(e)}")
     
-    @commands.command(name="download", description="Download files as ZIP")
+    @commands.command(name="download", description="ファイルをZIP形式でダウンロードします")
     async def download_files(self, ctx: commands.Context):
         """
         Download files as ZIP
@@ -222,29 +258,30 @@ class FileCog(commands.Cog):
             
             # If only one file, send it directly
             if len(files) == 1:
-                file_path = Path(self.file_manager.get_session_dir(session_uuid)) / files[0]
+                session_dir = self.file_manager.base_storage_dir / session_uuid
+                file_path = session_dir / files[0]
                 await ctx.send(file=discord.File(file_path))
                 logger.info(f"User {user_id} downloaded single file in session {session_uuid}")
                 return
             
-            # Create ZIP with multiple files
-            zip_buffer = io.BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-                for file in files:
-                    file_path = Path(self.file_manager.get_session_dir(session_uuid)) / file
-                    if file_path.exists():
-                        zip_file.write(file_path, arcname=file)
+            # Embed for file selection
+            embed = discord.Embed(
+                title="⬇️ ファイルダウンロード",
+                description="ダウンロードしたいファイルを選択するか、「全てダウンロード」ボタンを押してください。",
+                color=discord.Color.green()
+            )
+            embed.set_footer(text="Made by RovaexTeam")
             
-            zip_buffer.seek(0)
-            await ctx.send(file=discord.File(zip_buffer, filename=f"session_{session_uuid[:8]}.zip"))
+            view = FileSelectView(files, session_uuid, self.file_manager, ctx.author.id)
+            await ctx.send(embed=embed, view=view)
             
-            logger.info(f"User {user_id} downloaded {len(files)} files as ZIP in session {session_uuid}")
+            logger.info(f"User {user_id} opened download view in session {session_uuid}")
         
         except Exception as e:
             logger.error(f"Error in download_files: {e}", exc_info=True)
             await ctx.send(f"❌ Error downloading files: {str(e)}")
     
-    @commands.command(name="close", description="Close your coding session")
+    @commands.command(name="close", description="セッションを終了します（確認あり）")
     async def close_session(self, ctx: commands.Context):
         """
         Close the current coding session with confirmation
@@ -306,7 +343,7 @@ class FileCog(commands.Cog):
             logger.error(f"Error in close_session: {e}", exc_info=True)
             await ctx.send(f"❌ Error closing session: {str(e)}")
     
-    @commands.command(name="readme", description="Show project README")
+    @commands.command(name="readme", description="プロジェクトのREADMEを表示します")
     async def show_readme(self, ctx: commands.Context):
         """
         Show project README

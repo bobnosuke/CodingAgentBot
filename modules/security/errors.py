@@ -14,8 +14,13 @@ class ErrorHandler:
     async def handle_error(ctx: Any, error: Exception):
         """Handle errors and notify user with an Embed"""
         
-        # Get interaction if it exists
-        interaction = getattr(ctx, "interaction", None)
+        # Handle cases where ctx is already an Interaction (app commands)
+        if isinstance(ctx, discord.Interaction):
+            interaction = ctx
+        else:
+            # Get interaction if it exists in Context (prefix commands)
+            interaction = getattr(ctx, "interaction", None)
+        
         user = getattr(ctx, "author", getattr(ctx, "user", None))
         
         # Determine error type and message

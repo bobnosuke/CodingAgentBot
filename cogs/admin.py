@@ -14,38 +14,38 @@ class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    admin_group = app_commands.Group(name="admin", description="Administrator commands")
+    operator_group = app_commands.Group(name="operator", description="管理者専用コマンド")
 
-    @admin_group.command(name="health", description="Check bot health and database connection")
+    @operator_group.command(name="health", description="Botの稼働状況とデータベース接続を確認します")
     @PermissionManager.has_permission(PermissionLevel.ADMIN)
     async def health_check(self, interaction: discord.Interaction):
-        """Check bot health and database connection"""
+        """Botの稼働状況とデータベース接続を確認します"""
         await interaction.response.defer(ephemeral=True)
 
-        db_status = "❌ Disconnected"
+        db_status = "❌ 切断済み"
         if self.bot.db_manager:
             try:
                 if await self.bot.db_manager.health_check():
-                    db_status = "✅ Connected"
+                    db_status = "✅ 接続済み"
                 else:
-                    db_status = "⚠️ Error"
+                    db_status = "⚠️ エラー"
             except Exception as e:
-                db_status = f"❌ Error: {e}"
+                db_status = f"❌ エラー: {e}"
 
         embed = discord.Embed(
-            title="🩺 Bot Health Check",
+            title="🩺 Bot 稼働状況チェック",
             color=discord.Color.blue()
         )
-        embed.add_field(name="Bot Latency", value=f"{self.bot.latency * 1000:.2f} ms", inline=False)
-        embed.add_field(name="Database Status", value=db_status, inline=False)
+        embed.add_field(name="Bot レイテンシ", value=f"{self.bot.latency * 1000:.2f} ms", inline=False)
+        embed.add_field(name="データベース状態", value=db_status, inline=False)
         embed.set_footer(text="Made by RovaexTeam")
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @admin_group.command(name="stats", description="Display bot usage statistics")
+    @operator_group.command(name="stats", description="Botの利用統計を表示します")
     @PermissionManager.has_permission(PermissionLevel.ADMIN)
     async def stats(self, interaction: discord.Interaction):
-        """Display bot usage statistics"""
+        """Botの利用統計を表示します"""
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.db_manager.get_session() as session:
@@ -54,7 +54,7 @@ class AdminCog(commands.Cog):
             total_ai_calls = await MessageRepository.count_messages(session)
 
             embed = discord.Embed(
-                title="📊 Bot Usage Statistics",
+                title="📊 Bot 利用統計",
                 description="現在のボットの利用状況です。",
                 color=discord.Color.gold()
             )
@@ -65,15 +65,15 @@ class AdminCog(commands.Cog):
 
         await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @admin_group.command(name="shutdown", description="Shutdown the bot (Owner only)")
+    @operator_group.command(name="shutdown", description="Botをシャットダウンします（オーナー専用）")
     @PermissionManager.has_permission(PermissionLevel.BOT_OWNER)
     async def shutdown(self, interaction: discord.Interaction):
-        """Shutdown the bot (Owner only)"""
+        """Botをシャットダウンします（オーナー専用）"""
         await interaction.response.defer(ephemeral=True)
 
         embed = discord.Embed(
-            title="🔴 Shutting Down",
-            description="CoderAgent is now shutting down... Goodbye!",
+            title="🔴 シャットダウン中",
+            description="CoderAgent を終了しています... さようなら！",
             color=discord.Color.red()
         )
         embed.set_footer(text="Made by RovaexTeam")
@@ -85,5 +85,5 @@ class AdminCog(commands.Cog):
 async def setup(bot: commands.Bot):
     cog = AdminCog(bot)
     await bot.add_cog(cog)
-    if cog.admin_group not in bot.tree.get_commands():
-        bot.tree.add_command(cog.admin_group)
+    if cog.operator_group not in bot.tree.get_commands():
+        bot.tree.add_command(cog.operator_group)

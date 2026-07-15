@@ -23,7 +23,7 @@ class OpenRouterClient:
         """
         self.api_key = api_key
         self.base_url = Config.OPENROUTER_BASE_URL
-        self.timeout = aiohttp.ClientTimeout(seconds=Config.AI_TIMEOUT_SECONDS)
+        self.timeout = aiohttp.ClientTimeout(total=Config.AI_TIMEOUT_SECONDS)
     
     async def create_message(
         self,

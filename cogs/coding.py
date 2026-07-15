@@ -219,18 +219,18 @@ class CodingCog(commands.Cog):
     
     coding_group = app_commands.Group(name="coding", description="AI coding commands")
     
-    @coding_group.command(name="panel", description="Show coding control panel")
+    @coding_group.command(name="panel", description="コーディング管理パネルを表示します")
     @PermissionManager.has_permission(PermissionLevel.ADMIN)
     async def coding_panel(self, interaction: discord.Interaction):
         """
-        Show coding control panel with Select Menu
+        コーディング管理パネルを表示します
         
         Args:
             interaction: Discord interaction
         """
         try:
             embed = discord.Embed(
-                title="🎮 Coding Control Panel",
+                title="🎮 コーディング管理パネル",
                 description="以下のメニューから操作を選択してください。",
                 color=discord.Color.blue()
             )
@@ -258,7 +258,8 @@ class CodingCog(commands.Cog):
             
             view = CodingPanelView(self.bot, interaction.user.id)
             
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            # ephemeral=False に変更（一般ユーザーも利用可能にするため）
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
         
         except Exception as e:
             logger.error(f"Error in coding_panel: {e}", exc_info=True)
@@ -267,14 +268,14 @@ class CodingCog(commands.Cog):
                 ephemeral=True
             )
     
-    @coding_group.command(name="start", description="Start a new coding session")
+    @coding_group.command(name="start", description="新しいコーディングセッションを開始します")
     async def coding_start(self, interaction: discord.Interaction, project_name: str = None):
         """
-        Start a new coding session
+        新しいコーディングセッションを開始します
         
         Args:
             interaction: Discord interaction
-            project_name: Optional project name
+            project_name: オプションのプロジェクト名
         """
         try:
             # Check if user already has active session
@@ -406,9 +407,12 @@ class CodingCog(commands.Cog):
         session_uuid = self.session_manager.get_user_active_session(user_id)
 
         # Check if message is in an active CodingRoom and from the session owner
-        if session_uuid and str(message.channel.id) == self.session_manager.get_session(session_uuid)["channel_id"]:
+        session_info = self.session_manager.get_session(session_uuid) if session_uuid else None
+        if session_info and str(message.channel.id) == session_info["channel_id"]:
             # Ignore messages that start with the bot's prefix (commands)
+            # According to COMMANDS.md, messages starting with '!' are commands.
             if message.content.startswith(self.bot.command_prefix):
+                await self.bot.process_commands(message)
                 return
 
             # Check if AI service is initialized
@@ -416,6 +420,7 @@ class CodingCog(commands.Cog):
                 await message.channel.send(
                     "❌ AI service not initialized. Please try starting a new session."
                 )
+                await self.bot.process_commands(message)
                 return
 
             # Get AI service
@@ -453,19 +458,31 @@ class CodingCog(commands.Cog):
             # Log message for usage tracking
             db_session = self.bot.db_manager.get_session()
             try:
-                await MessageRepository.create_message(
+                db_session_id = session_info["db_session_id"]
+                # Save user message
+                await MessageRepository.add_message(
                     db_session,
-                    session_uuid,
-                    user_id,
+                    db_session_id,
+                    "user",
                     message.content,
-                    full_response,
-                    ai_service.current_model,
-                    ai_service.last_input_tokens,
-                    ai_service.last_output_tokens
+                    token_input=ai_service.last_input_tokens
                 )
+                # Save assistant response
+                if full_response:
+                    await MessageRepository.add_message(
+                        db_session,
+                        db_session_id,
+                        "assistant",
+                        full_response,
+                        token_output=ai_service.last_output_tokens
+                    )
             finally:
                 await db_session.close()
+            
+            # Since we handled the AI chat, we don't need to process other commands
+            return
 
+        # Process commands for messages outside CodingRoom or prefix commands
         await self.bot.process_commands(message)
 
     @coding_group.command(name="server", description="View server statistics (Admin only)")
@@ -517,10 +534,10 @@ class CodingCog(commands.Cog):
                 ephemeral=True
             )
     
-    @coding_group.command(name="end", description="End your current coding session")
+    @coding_group.command(name="end", description="現在のコーディングセッションを終了します")
     async def coding_end(self, interaction: discord.Interaction):
         """
-        End the current coding session
+        現在のコーディングセッションを終了します
         
         Args:
             interaction: Discord interaction
