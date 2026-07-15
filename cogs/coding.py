@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from logger import setup_logger
-from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository
+from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository, UsageLogRepository
 from modules.session.manager import SessionManager
 from modules.ai.openrouter import OpenRouterClient, AIService
 from modules.utils.i18n import i18n
@@ -216,6 +216,13 @@ class CodingCog(commands.Cog):
                 if full_response:
                     await response_msg.edit(content=full_response)
                     await MessageRepository.add_message(db_session, session_info["db_session_id"], "assistant", full_response)
+                    
+                    # Log usage and increment message count
+                    await UsageLogRepository.log_usage(
+                        db_session, 
+                        user.id, 
+                        ai_service.current_model
+                    )
                 else:
                     await response_msg.edit(content=i18n.translate(lang, "CODING.AI_EMPTY_RESPONSE"))
                 

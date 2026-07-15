@@ -4,9 +4,10 @@ Provides abstraction for database access
 """
 from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, func
 from logger import setup_logger
 from .models import User, APIKey, Session, Message, Project, UsageLog, SystemLog
+from datetime import datetime, time
 
 logger = setup_logger(__name__)
 
@@ -58,12 +59,26 @@ class UserRepository:
         except Exception as e:
             logger.error(f"Error in get_user_by_discord_id: {e}")
             raise
+
+    @staticmethod
+    async def increment_message_count(session: AsyncSession, user_id: int) -> None:
+        """Increment user message counts"""
+        try:
+            user = await session.get(User, user_id)
+            if user:
+                user.total_message_count += 1
+                user.daily_message_count += 1
+                user.last_active_at = datetime.utcnow()
+                await session.commit()
+        except Exception as e:
+            logger.error(f"Error incrementing message count: {e}")
+            await session.rollback()
+            raise
     
     @staticmethod
     async def count_users(session: AsyncSession) -> int:
         """Count total users"""
         try:
-            from sqlalchemy import func
             stmt = select(func.count(User.id))
             result = await session.execute(stmt)
             return result.scalar() or 0
@@ -119,7 +134,6 @@ class APIKeyRepository:
     async def update_last_used(session: AsyncSession, api_key_id: int) -> None:
         """Update last used timestamp"""
         try:
-            from datetime import datetime
             stmt = update(APIKey).where(APIKey.id == api_key_id).values(
                 last_used_at=datetime.utcnow()
             )
@@ -227,7 +241,6 @@ class SessionRepository:
     async def count_sessions(session: AsyncSession) -> int:
         """Count total sessions"""
         try:
-            from sqlalchemy import func
             stmt = select(func.count(Session.id))
             result = await session.execute(stmt)
             return result.scalar() or 0
@@ -239,19 +252,17 @@ class SessionRepository:
     async def count_active_sessions(session: AsyncSession) -> int:
         """Count active sessions"""
         try:
-            from sqlalchemy import func
             stmt = select(func.count(Session.id)).where(Session.is_active == True)
             result = await session.execute(stmt)
             return result.scalar() or 0
         except Exception as e:
             logger.error(f"Error in count_active_sessions: {e}")
             raise
-
+    
     @staticmethod
     async def count_user_sessions(session: AsyncSession, user_id: int) -> int:
         """Count total sessions for a specific user"""
         try:
-            from sqlalchemy import func
             stmt = select(func.count(Session.id)).where(Session.user_id == user_id)
             result = await session.execute(stmt)
             return result.scalar() or 0
@@ -295,7 +306,6 @@ class MessageRepository:
     async def count_messages(session: AsyncSession) -> int:
         """Count total messages"""
         try:
-            from sqlalchemy import func
             stmt = select(func.count(Message.id))
             result = await session.execute(stmt)
             return result.scalar() or 0
@@ -360,7 +370,7 @@ class UsageLogRepository:
         token_output: int = 0,
         estimated_cost: float = 0.0
     ) -> UsageLog:
-        """Log AI usage"""
+        """Log AI usage and increment user counts"""
         try:
             log = UsageLog(
                 user_id=user_id,
@@ -370,6 +380,14 @@ class UsageLogRepository:
                 estimated_cost=estimated_cost
             )
             session.add(log)
+            
+            # Also increment user counts
+            user = await session.get(User, user_id)
+            if user:
+                user.total_message_count += 1
+                user.daily_message_count += 1
+                user.last_active_at = datetime.utcnow()
+            
             await session.commit()
             return log
         except Exception as e:
@@ -381,15 +399,14 @@ class UsageLogRepository:
     async def get_daily_usage_count(session: AsyncSession, user_id: int) -> int:
         """Get message count for today for a user"""
         try:
-            from datetime import datetime, time
             today_start = datetime.combine(datetime.utcnow().date(), time.min)
             
-            stmt = select(UsageLog).where(
+            stmt = select(func.count(UsageLog.id)).where(
                 (UsageLog.user_id == user_id) & 
                 (UsageLog.created_at >= today_start)
             )
             result = await session.execute(stmt)
-            return len(result.scalars().all())
+            return result.scalar() or 0
         except Exception as e:
             logger.error(f"Error in get_daily_usage_count: {e}")
             raise
