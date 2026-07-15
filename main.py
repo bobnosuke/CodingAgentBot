@@ -13,7 +13,7 @@ from config import Config
 # Load environment variables
 load_dotenv()
 
-logger = setup_logger(__name__)
+
 
 class CoderAgent(commands.Bot):
     def __init__(self):
@@ -82,8 +82,12 @@ class CoderAgent(commands.Bot):
 async def main():
     # Validate configuration
     if not Config.validate():
-        logger.error("設定の検証に失敗しました")
+        print("設定の検証に失敗しました。終了します。")
         return
+    
+    global logger
+    logger = setup_logger(__name__)
+    logger.info("ロガーが初期化されました")
     bot = CoderAgent()
     
     # Setup global error handler for tree
