@@ -58,5 +58,3 @@ def setup_logger(name: str) -> logging.Logger:
     return logger
 
 
-# Create module-level logger
-logger = setup_logger(__name__)
