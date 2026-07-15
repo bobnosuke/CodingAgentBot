@@ -406,9 +406,12 @@ class CodingCog(commands.Cog):
         session_uuid = self.session_manager.get_user_active_session(user_id)
 
         # Check if message is in an active CodingRoom and from the session owner
-        if session_uuid and str(message.channel.id) == self.session_manager.get_session(session_uuid)["channel_id"]:
+        session_info = self.session_manager.get_session(session_uuid) if session_uuid else None
+        if session_info and str(message.channel.id) == session_info["channel_id"]:
             # Ignore messages that start with the bot's prefix (commands)
+            # According to COMMANDS.md, messages starting with '!' are commands.
             if message.content.startswith(self.bot.command_prefix):
+                await self.bot.process_commands(message)
                 return
 
             # Check if AI service is initialized
@@ -416,6 +419,7 @@ class CodingCog(commands.Cog):
                 await message.channel.send(
                     "❌ AI service not initialized. Please try starting a new session."
                 )
+                await self.bot.process_commands(message)
                 return
 
             # Get AI service
@@ -453,19 +457,31 @@ class CodingCog(commands.Cog):
             # Log message for usage tracking
             db_session = self.bot.db_manager.get_session()
             try:
-                await MessageRepository.create_message(
+                db_session_id = session_info["db_session_id"]
+                # Save user message
+                await MessageRepository.add_message(
                     db_session,
-                    session_uuid,
-                    user_id,
+                    db_session_id,
+                    "user",
                     message.content,
-                    full_response,
-                    ai_service.current_model,
-                    ai_service.last_input_tokens,
-                    ai_service.last_output_tokens
+                    token_input=ai_service.last_input_tokens
                 )
+                # Save assistant response
+                if full_response:
+                    await MessageRepository.add_message(
+                        db_session,
+                        db_session_id,
+                        "assistant",
+                        full_response,
+                        token_output=ai_service.last_output_tokens
+                    )
             finally:
                 await db_session.close()
+            
+            # Since we handled the AI chat, we don't need to process other commands
+            return
 
+        # Process commands for messages outside CodingRoom or prefix commands
         await self.bot.process_commands(message)
 
     @coding_group.command(name="server", description="View server statistics (Admin only)")
