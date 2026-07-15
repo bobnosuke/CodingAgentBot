@@ -19,8 +19,15 @@ class SettingView(discord.ui.View):
     def __init__(self, bot: commands.Bot):
         super().__init__(timeout=None)
         self.bot = bot
-    
-    async def _get_user_lang(self, interaction: discord.Interaction):
+
+    @discord.ui.button(
+        label="Start Settings", 
+        style=discord.ButtonStyle.primary, 
+        emoji="⚙️",
+        custom_id="persistent:setting_start_button"
+    )
+    async def start_setting(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Handle 'Start Settings' button click - Show Ephemeral Panel"""
         db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_or_create_user(
@@ -29,70 +36,69 @@ class SettingView(discord.ui.View):
                 interaction.user.name, 
                 interaction.user.discriminator
             )
-            return user.language or "en-US"
-        finally:
-            await db_session.close()
-
-    @discord.ui.select(
-        placeholder="🎯 Select an option",
-        options=[
-            discord.SelectOption(label="Change AI Model", value="model", emoji="🤖", description="Select AI model for coding"),
-            discord.SelectOption(label="Usage Stats", value="usage", emoji="📊", description="Check your API usage"),
-            discord.SelectOption(label="API Key Management", value="apikey", emoji="🔑", description="Register or delete API key"),
-            discord.SelectOption(label="Language Settings", value="lang", emoji="🌐", description="Change bot language"),
-        ],
-        custom_id="persistent:setting_select"
-    )
-    async def setting_select(self, interaction: discord.Interaction, select: discord.ui.Select):
-        """Handle selection from Public Panel"""
-        lang = await self._get_user_lang(interaction)
-        action = select.values[0]
-        
-        if action == "model":
-            await self._show_model_selection(interaction, lang)
-        elif action == "usage":
-            await self._show_usage_stats(interaction, lang)
-        elif action == "apikey":
-            await self._show_apikey_mgmt(interaction, lang)
-        elif action == "lang":
-            await self._show_lang_setting(interaction, lang)
-
-    async def _show_model_selection(self, interaction: discord.Interaction, lang: str):
-        embed = discord.Embed(
-            title=i18n.translate(lang, "SETTING.MODEL_SELECT_TITLE"),
-            description=i18n.translate(lang, "SETTING.MODEL_SELECT_DESC"),
-            color=discord.Color.blue()
-        )
-        embed.add_field(name=f"🚀 {i18n.translate(lang, 'SETTING.MODEL_HIGH')}", value="Claude 3.5 Sonnet", inline=False)
-        embed.add_field(name=f"⚖️ {i18n.translate(lang, 'SETTING.MODEL_BALANCE')}", value="Gemini 1.5 Pro", inline=False)
-        embed.add_field(name=f"💰 {i18n.translate(lang, 'SETTING.MODEL_LOW')}", value="Llama 3.1 70B", inline=False)
-        embed.set_footer(text="Made by RovaexTeam")
-        
-        view = ModelSelectionView(self.bot, lang)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-
-    async def _show_usage_stats(self, interaction: discord.Interaction, lang: str):
-        await interaction.response.defer(ephemeral=True)
-        db_session = self.bot.db_manager.get_session()
-        try:
-            user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
-            total_messages = await MessageRepository.count_user_messages(db_session, user.id)
+            lang = user.language or "en-US"
+            api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
             daily_count = await UsageLogRepository.get_daily_usage_count(db_session, user.id)
             
+            # Create Status Embed
             embed = discord.Embed(
-                title=i18n.translate(lang, "SETTING.USAGE_TITLE"),
-                color=discord.Color.gold()
+                title=i18n.translate(lang, "SETTING.CURRENT_STATUS_TITLE"),
+                color=discord.Color.blue()
             )
-            embed.add_field(name=i18n.translate(lang, "SETTING.USAGE_TOTAL_MESSAGES"), value=str(total_messages), inline=True)
-            embed.add_field(name=i18n.translate(lang, "SETTING.USAGE_DAILY_MESSAGES"), value=str(daily_count), inline=True)
             embed.add_field(name=i18n.translate(lang, "SETTING.USAGE_CURRENT_MODEL"), value=user.model_preset.capitalize(), inline=True)
+            embed.add_field(name=i18n.translate(lang, "SETTING.LANG_SETTING"), value="🇺🇸 English" if lang == "en-US" else "🇯🇵 日本語", inline=True)
+            embed.add_field(name="API Key", value="✅ Registered" if api_key else "❌ Not Registered", inline=True)
+            embed.add_field(name=i18n.translate(lang, "SETTING.USAGE_DAILY_MESSAGES"), value=f"{daily_count} / 50", inline=True)
             embed.set_footer(text="Made by RovaexTeam")
             
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            # Create Detail View with Select Menu
+            view = SettingDetailView(self.bot, lang)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         finally:
             await db_session.close()
 
-    async def _show_apikey_mgmt(self, interaction: discord.Interaction, lang: str):
+
+class SettingDetailView(discord.ui.View):
+    """Ephemeral View for detailed settings"""
+    
+    def __init__(self, bot: commands.Bot, lang: str):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.lang = lang
+        
+        # Add select menu
+        self.select = discord.ui.Select(
+            placeholder=i18n.translate(lang, "SETTING.SELECT_PLACEHOLDER"),
+            options=[
+                discord.SelectOption(label=i18n.translate(lang, "SETTING.MODEL_CHANGE"), value="model", emoji="🤖", description=i18n.translate(lang, "SETTING.MODEL_CHANGE_DESC")),
+                discord.SelectOption(label=i18n.translate(lang, "SETTING.API_KEY_MGMT"), value="apikey", emoji="🔑", description=i18n.translate(lang, "SETTING.API_KEY_MGMT_DESC")),
+                discord.SelectOption(label=i18n.translate(lang, "SETTING.LANG_SETTING"), value="lang", emoji="🌐", description=i18n.translate(lang, "SETTING.LANG_SETTING_DESC")),
+            ]
+        )
+        self.select.callback = self.select_callback
+        self.add_item(self.select)
+
+    async def select_callback(self, interaction: discord.Interaction):
+        action = self.select.values[0]
+        
+        if action == "model":
+            await self._show_model_selection(interaction)
+        elif action == "apikey":
+            await self._show_apikey_mgmt(interaction)
+        elif action == "lang":
+            await self._show_lang_setting(interaction)
+
+    async def _show_model_selection(self, interaction: discord.Interaction):
+        embed = discord.Embed(
+            title=i18n.translate(self.lang, "SETTING.MODEL_SELECT_TITLE"),
+            description=i18n.translate(self.lang, "SETTING.MODEL_SELECT_DESC"),
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="Made by RovaexTeam")
+        view = ModelSelectionView(self.bot, self.lang)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+    async def _show_apikey_mgmt(self, interaction: discord.Interaction):
         db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
@@ -100,28 +106,28 @@ class SettingView(discord.ui.View):
             
             if api_key:
                 embed = discord.Embed(
-                    title=i18n.translate(lang, "SETTING.API_KEY_MGMT"),
-                    description=i18n.translate(lang, "SETTING.API_KEY_DELETE_CONFIRM"),
+                    title=i18n.translate(self.lang, "SETTING.API_KEY_MGMT"),
+                    description=i18n.translate(self.lang, "SETTING.API_KEY_DELETE_CONFIRM"),
                     color=discord.Color.red()
                 )
                 embed.set_footer(text="Made by RovaexTeam")
-                view = APIKeyDeleteConfirmView(self.bot, lang)
-                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+                view = APIKeyDeleteConfirmView(self.bot, self.lang)
+                await interaction.response.edit_message(embed=embed, view=view)
             else:
-                modal = APIKeyModal(self.bot, lang)
+                modal = APIKeyModal(self.bot, self.lang)
                 await interaction.response.send_modal(modal)
         finally:
             await db_session.close()
 
-    async def _show_lang_setting(self, interaction: discord.Interaction, lang: str):
+    async def _show_lang_setting(self, interaction: discord.Interaction):
         embed = discord.Embed(
-            title=i18n.translate(lang, "SETTING.LANG_SETTING"),
-            description=i18n.translate(lang, "SETTING.LANG_SETTING_DESC"),
+            title=i18n.translate(self.lang, "SETTING.LANG_SETTING"),
+            description=i18n.translate(self.lang, "SETTING.LANG_SETTING_DESC"),
             color=discord.Color.purple()
         )
         embed.set_footer(text="Made by RovaexTeam")
-        view = LanguageSelectionView(self.bot, lang)
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        view = LanguageSelectionView(self.bot, self.lang)
+        await interaction.response.edit_message(embed=embed, view=view)
 
 
 class LanguageSelectionView(discord.ui.View):
@@ -251,7 +257,7 @@ class SettingCog(commands.Cog):
     
     @app_commands.command(name="setting", description="Configure bot settings (AI model, API key, language)")
     async def setting(self, interaction: discord.Interaction):
-        """Show User Settings Panel"""
+        """Show User Settings Panel (Public Start Button)"""
         db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_or_create_user(
@@ -270,16 +276,10 @@ class SettingCog(commands.Cog):
             embed.set_footer(text="Made by RovaexTeam")
             
             view = SettingView(self.bot)
-            # Update select menu labels based on language
+            # Update button label based on language
             for item in view.children:
-                if isinstance(item, discord.ui.Select) and item.custom_id == "persistent:setting_select":
-                    item.placeholder = i18n.translate(lang, "SETTING.SELECT_PLACEHOLDER")
-                    item.options = [
-                        discord.SelectOption(label=i18n.translate(lang, "SETTING.MODEL_CHANGE"), value="model", emoji="🤖", description=i18n.translate(lang, "SETTING.MODEL_CHANGE_DESC")),
-                        discord.SelectOption(label=i18n.translate(lang, "SETTING.USAGE_STATS"), value="usage", emoji="📊", description=i18n.translate(lang, "SETTING.USAGE_STATS_DESC")),
-                        discord.SelectOption(label=i18n.translate(lang, "SETTING.API_KEY_MGMT"), value="apikey", emoji="🔑", description=i18n.translate(lang, "SETTING.API_KEY_MGMT_DESC")),
-                        discord.SelectOption(label=i18n.translate(lang, "SETTING.LANG_SETTING"), value="lang", emoji="🌐", description=i18n.translate(lang, "SETTING.LANG_SETTING_DESC")),
-                    ]
+                if isinstance(item, discord.ui.Button) and item.custom_id == "persistent:setting_start_button":
+                    item.label = i18n.translate(lang, "SETTING.START_BUTTON")
             
             await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
         finally:

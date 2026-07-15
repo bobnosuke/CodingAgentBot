@@ -71,7 +71,8 @@ class CoderAgent(commands.Bot):
         from cogs.setting import SettingView
         from cogs.coding import CodingPanelView
         
-        self.add_view(SettingView(self.db_manager, self.encryption_manager))
+        # i18n対応版ではbotインスタンスのみを渡すように変更
+        self.add_view(SettingView(self))
         self.add_view(CodingPanelView(self))
         logger.info("✅ Persistent views registered")
 
@@ -110,7 +111,7 @@ class CoderAgent(commands.Bot):
         # Sync commands to Discord
         await self.tree.sync()
         logger.info("✅ Commands synced to Discord")
-	
+		
     async def reload_cogs(self) -> None:
         """Reload all cogs"""
         cogs_dir = Path(__file__).parent / "cogs"
@@ -123,7 +124,7 @@ class CoderAgent(commands.Bot):
                     logger.info(f"🔄 Reloaded cog: {cog_name}")
                 except Exception as e:
                     logger.error(f"❌ Failed to reload cog {cog_name}: {e}")
-	
+		
     @commands.command(name="reload", description="Reload all cogs (Owner only)")
     async def reload_command(self, ctx: commands.Context):
         """Reload all cogs"""

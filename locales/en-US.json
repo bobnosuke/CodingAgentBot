@@ -11,9 +11,11 @@
         "PERMISSION_DENIED": "❌ You don't have permission to use this command."
     },
     "SETTING": {
-        "PANEL_TITLE": "⚙️ User Settings",
-        "PANEL_DESC": "Manage your AI model, API keys, and language settings.",
-        "SELECT_PLACEHOLDER": "🎯 Select an option",
+        "PANEL_TITLE": "⚙️ CoderAgent User Settings",
+        "PANEL_DESC": "Configure your AI model, API key, and language settings.\nClick the button below to start configuration (Ephemeral).",
+        "START_BUTTON": "Start Settings",
+        "CURRENT_STATUS_TITLE": "📊 Current Configuration Status",
+        "SELECT_PLACEHOLDER": "🎯 Select an option to change",
         "MODEL_CHANGE": "Change AI Model",
         "MODEL_CHANGE_DESC": "Select which AI model to use for coding.",
         "USAGE_STATS": "Check Usage Stats",
