@@ -40,6 +40,7 @@ class CoderAgent(commands.Bot):
         self.config = Config
         self.db_manager = None
         self.encryption_manager = None
+        self.owner_id = int(os.getenv("OWNER_ID")) if os.getenv("OWNER_ID") else None
         
         logger.info("CoderAgent instance initialized")
     
@@ -97,6 +98,39 @@ class CoderAgent(commands.Bot):
                 name="for /coding commands"
             )
         )
+        
+        # Sync commands to Discord
+        await self.tree.sync()
+        logger.info("✅ Commands synced to Discord")
+
+    async def reload_cogs(self) -> None:
+        """Reload all cogs"""
+        cogs_dir = Path(__file__).parent / "cogs"
+        for filename in os.listdir(cogs_dir):
+            if filename.endswith(".py") and not filename.startswith("_"):
+                cog_name = filename[:-3]
+                try:
+                    await self.unload_extension(f"cogs.{cog_name}")
+                    await self.load_extension(f"cogs.{cog_name}")
+                    logger.info(f"🔄 Reloaded cog: {cog_name}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to reload cog {cog_name}: {e}")
+
+    @commands.command(name="reload", description="Reload all cogs (Owner only)")
+    async def reload_command(self, ctx: commands.Context):
+        """
+        Reload all cogs
+        
+        Args:
+            ctx: Command context
+        """
+        if ctx.author.id != self.owner_id:
+            await ctx.send("❌ You are not the owner of this bot.", ephemeral=True)
+            return
+
+        await ctx.send("🔄 Reloading cogs...", ephemeral=True)
+        await self.reload_cogs()
+        await ctx.send("✅ Cogs reloaded successfully!", ephemeral=True)
     
     async def on_error(self, event: str, *args, **kwargs) -> None:
         """Handle errors from event listeners"""
