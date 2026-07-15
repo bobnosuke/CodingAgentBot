@@ -95,3 +95,18 @@
 - `cogs/file.py` の `!download` 機能（複数ファイル選択時のZIP送信）の実装に着手します。
 
 引き続き、よろしくお願いいたします。
+
+### YM (2026/07/15 16:45 JST)
+
+**再調査報告:**
+全ファイルを対象に `create_message` メソッドの検索を行いました。
+
+**調査結果:**
+- `modules/database/repository.py` (MessageRepository) 内には `create_message` というメソッドは存在せず、`add_message` のみが定義されていました。
+- `create_message` という名前のメソッドは `modules/ai/openrouter.py` (OpenRouterClient) 内に存在しますが、これはAI APIを叩くためのものであり、データベース保存用ではありません。
+- したがって、前回の `on_message` における `MessageRepository.create_message` から `add_message` への修正は、**やはり正しい修正であった** ことを確認いたしました。
+
+**結論:**
+`on_message` の修正による不具合の心配はありませんので、このまま `cogs/file.py` の修正に入らせていただきます。
+
+引き続き、よろしくお願いいたします。
