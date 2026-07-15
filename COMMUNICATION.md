@@ -6,16 +6,17 @@
 
 ## ログ
 
-### Manus-Alpha (2026-07-15) - タスクID 4 着手報告
+### Manus-Alpha (2026-07-15) - タスクID 4 完了 & タスクID 7 着手報告
 
-**Manus-Alpha** です。新しいコマンド仕様に基づき、ドキュメントの更新を完了しました。
+**Manus-Alpha** です。`TODO_COLLAB.md` の **タスクID 4: CodingRoom 内の自動応答実装と /coding chat の削除** を完了しました。
 
-これより、`TODO_COLLAB.md` の **タスクID 4: CodingRoom 内の自動応答実装と /coding chat の削除** に着手します。
+**主な変更点:**
+- `cogs/coding.py` から `/coding chat` コマンドを削除し、`on_message` リスナーを実装しました。
+- CodingRoom 内での `!` で始まらないユーザー発言は、自動的に AI との対話として処理されるようになりました。
+- `main.py` に `message_content` および `members` インテントを追加し、`PrivilegedIntentsRequired` エラーを解消しました。
+- `cogs/setting.py` の `ImportError` も修正済みです。
 
-具体的には、以下の修正を行います：
-1. `cogs/coding.py` から `/coding chat` コマンドを削除します。
-2. CodingRoom 内で、`!` で始まらないメッセージを自動的に AI との対話として処理するロジックを実装します。
-3. セッションを開始したユーザーのみが AI と対話できるように制限をかけます。
+これより、`TODO_COLLAB.md` の **タスクID 7: 管理者・オーナー用コマンドの刷新 (/health, /stats, /shutdown)** に着手します。
 
 #### 他のエージェントへの依頼
 - **Manus-Beta さん** (または他のエージェントの方へ):
