@@ -6,8 +6,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 import logging
-from typing import Any
-from typing import Optional
+from typing import Any, Optional, Union
 
 from modules.database.repository import UserRepository, APIKeyRepository, UsageLogRepository
 from modules.security.permissions import PermissionLevel, PermissionManager
@@ -46,6 +45,7 @@ class SettingView(discord.ui.View):
         
         try:
             if value == "api_key":
+                # Modalは新規応答として送信
                 await interaction.response.send_modal(APIKeyModal(self.db_manager, self.encryption_manager))
             elif value == "model":
                 await self.show_model_selection(interaction)
@@ -55,10 +55,16 @@ class SettingView(discord.ui.View):
                 await self.confirm_delete_key(interaction)
         except Exception as e:
             logger.error(f"Error in select_callback: {e}", exc_info=True)
-            await interaction.response.send_message(
-                f"❌ エラーが発生しました: {str(e)}",
-                ephemeral=True
+            # エラー通知も既存メッセージの更新で対応
+            embed = discord.Embed(
+                title="❌ エラー",
+                description=f"エラーが発生しました: {str(e)}",
+                color=discord.Color.red()
             )
+            if interaction.response.is_done():
+                await interaction.edit_original_response(embed=embed, view=None)
+            else:
+                await interaction.response.edit_message(embed=embed, view=None)
 
     async def show_model_selection(self, interaction: discord.Interaction):
         """Show model selection menu"""
@@ -74,25 +80,24 @@ class SettingView(discord.ui.View):
             embed.add_field(name="💰 節約", value="簡単な質問、軽量コード生成に最適", inline=False)
             embed.set_footer(text="Made by RovaexTeam")
             
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            # メッセージを編集して更新
+            await interaction.response.edit_message(embed=embed, view=view)
         except Exception as e:
             logger.error(f"Error in show_model_selection: {e}", exc_info=True)
-            await interaction.response.send_message(
-                f"❌ エラーが発生しました: {str(e)}",
-                ephemeral=True
-            )
+            await interaction.response.send_message(f"❌ エラーが発生しました: {str(e)}", ephemeral=True)
 
     async def show_status(self, interaction: discord.Interaction):
         """Show usage status"""
         try:
-            await interaction.response.defer(ephemeral=True)
+            # 編集モードでのdefer
+            await interaction.response.defer(ephemeral=True, thinking=True)
             
             db_session = self.db_manager.get_session()
             try:
                 db_user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
                 
                 if not db_user:
-                    await interaction.followup.send("ユーザー情報が見つかりません。まずはコマンドを実行してください。", ephemeral=True)
+                    await interaction.edit_original_response(content="ユーザー情報が見つかりません。まずはコマンドを実行してください。", view=None)
                     return
 
                 # 本日の利用回数を取得
@@ -109,15 +114,13 @@ class SettingView(discord.ui.View):
                 embed.add_field(name="残り利用回数", value=str(remaining), inline=True)
                 embed.set_footer(text="Made by RovaexTeam")
                 
-                await interaction.followup.send(embed=embed, ephemeral=True)
+                # 既存のメッセージを更新
+                await interaction.edit_original_response(embed=embed, view=self)
             finally:
                 await db_session.close()
         except Exception as e:
             logger.error(f"Error in show_status: {e}", exc_info=True)
-            await interaction.followup.send(
-                f"❌ エラーが発生しました: {str(e)}",
-                ephemeral=True
-            )
+            await interaction.edit_original_response(content=f"❌ エラーが発生しました: {str(e)}", view=None)
 
     async def confirm_delete_key(self, interaction: discord.Interaction):
         """Confirm API key deletion"""
@@ -130,13 +133,11 @@ class SettingView(discord.ui.View):
             )
             embed.set_footer(text="Made by RovaexTeam")
             
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            # メッセージを編集して更新
+            await interaction.response.edit_message(embed=embed, view=view)
         except Exception as e:
             logger.error(f"Error in confirm_delete_key: {e}", exc_info=True)
-            await interaction.response.send_message(
-                f"❌ エラーが発生しました: {str(e)}",
-                ephemeral=True
-            )
+            await interaction.response.send_message(f"❌ エラーが発生しました: {str(e)}", ephemeral=True)
 
 
 class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
@@ -157,14 +158,11 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
 
     async def on_submit(self, interaction: discord.Interaction):
         """Handle API key submission"""
+        # Modal送信後は新規応答になるため、ここは既存のephemeralがあればそれを更新したいが、
+        # Modalのinteractionは元のメッセージを直接editできない場合があるため、一旦defer
         await interaction.response.defer(ephemeral=True)
         
         try:
-            # Note: discord.Interaction object doesn't have is_interaction() method.
-            # For Modal on_submit, it's always an interaction.
-            # Prefix commands wouldn't trigger this Modal's on_submit directly.
-            pass
-
             db_session = self.db_manager.get_session()
             try:
                 db_user = await UserRepository.get_or_create_user(
@@ -251,7 +249,8 @@ class ModelSelectionView(discord.ui.View):
                     )
                     embed.set_footer(text="Made by RovaexTeam")
                     
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    # 完了通知もメッセージ更新で対応
+                    await interaction.edit_original_response(embed=embed, view=None)
                 else:
                     await interaction.followup.send("ユーザー情報が見つかりません。", ephemeral=True)
             finally:
@@ -264,7 +263,7 @@ class ModelSelectionView(discord.ui.View):
                 color=discord.Color.red()
             )
             embed.set_footer(text="Made by RovaexTeam")
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed, view=None)
 
 
 class DeleteConfirmView(discord.ui.View):
@@ -304,7 +303,8 @@ class DeleteConfirmView(discord.ui.View):
                     )
                     embed.set_footer(text="Made by RovaexTeam")
                     
-                    await interaction.followup.send(embed=embed, ephemeral=True)
+                    # 完了通知もメッセージ更新で対応
+                    await interaction.edit_original_response(embed=embed, view=None)
                 else:
                     await interaction.followup.send("ユーザー情報が見つかりません。", ephemeral=True)
             finally:
@@ -317,7 +317,7 @@ class DeleteConfirmView(discord.ui.View):
                 color=discord.Color.red()
             )
             embed.set_footer(text="Made by RovaexTeam")
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.edit_original_response(embed=embed, view=None)
 
     @discord.ui.button(label="キャンセル", style=discord.ButtonStyle.secondary, emoji="❌")
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -334,7 +334,8 @@ class DeleteConfirmView(discord.ui.View):
             )
             embed.set_footer(text="Made by RovaexTeam")
             
-            await interaction.response.send_message(embed=embed, ephemeral=True)
+            # キャンセル通知もメッセージ更新で対応
+            await interaction.response.edit_message(embed=embed, view=None)
         except Exception as e:
             logger.error(f"Error in cancel_button: {e}", exc_info=True)
 
@@ -369,7 +370,11 @@ class SettingCog(commands.Cog):
                 view = SettingView(user.id, self.bot.db_manager, self.bot.encryption_manager)
                 
                 if isinstance(target, discord.Interaction):
-                    await target.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+                    # 最初のephemeral送信（または公開メッセージへの応答）はsend_message/followup.sendを使用
+                    if target.response.is_done():
+                        await target.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+                    else:
+                        await target.response.send_message(embed=embed, view=view, ephemeral=ephemeral)
                 else:
                     await target.send(embed=embed, view=view)
             finally:
@@ -383,7 +388,10 @@ class SettingCog(commands.Cog):
             )
             error_embed.set_footer(text="Made by RovaexTeam")
             if isinstance(target, discord.Interaction):
-                await target.followup.send(embed=error_embed, ephemeral=ephemeral)
+                if target.response.is_done():
+                    await target.followup.send(embed=error_embed, ephemeral=ephemeral)
+                else:
+                    await target.response.send_message(embed=error_embed, ephemeral=ephemeral)
             else:
                 await target.send(embed=error_embed)
 
@@ -392,6 +400,7 @@ class SettingCog(commands.Cog):
     async def setting_slash(self, interaction: discord.Interaction):
         """Show the setting menu via slash command"""
         # ephemeral=False に変更して設定開始パネルを公開する
+        # ここは「最初の操作」ではないため、deferしてパネルを送信する
         await interaction.response.defer(ephemeral=False)
         await self._send_setting_panel(interaction, interaction.user, ephemeral=False)
 
