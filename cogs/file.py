@@ -119,7 +119,7 @@ class FileCog(commands.Cog):
             return False
         return True
     
-    @commands.command(name="list", description="List all files in your coding session")
+    @commands.command(name="list", description="セッション内のファイル一覧を表示します")
     async def list_files(self, ctx: commands.Context):
         """
         List all files in the current session
@@ -174,7 +174,7 @@ class FileCog(commands.Cog):
             logger.error(f"Error in list_files: {e}", exc_info=True)
             await ctx.send(f"❌ Error listing files: {str(e)}")
     
-    @commands.command(name="get", description="Get file content")
+    @commands.command(name="get", description="ファイルの内容を取得します")
     async def get_file(self, ctx: commands.Context, filename: str):
         """
         Get file content
@@ -226,7 +226,7 @@ class FileCog(commands.Cog):
             logger.error(f"Error in get_file: {e}", exc_info=True)
             await ctx.send(f"❌ Error retrieving file: {str(e)}")
     
-    @commands.command(name="download", description="Download files as ZIP")
+    @commands.command(name="download", description="ファイルをZIP形式でダウンロードします")
     async def download_files(self, ctx: commands.Context):
         """
         Download files as ZIP
@@ -281,7 +281,7 @@ class FileCog(commands.Cog):
             logger.error(f"Error in download_files: {e}", exc_info=True)
             await ctx.send(f"❌ Error downloading files: {str(e)}")
     
-    @commands.command(name="close", description="Close your coding session")
+    @commands.command(name="close", description="セッションを終了します（確認あり）")
     async def close_session(self, ctx: commands.Context):
         """
         Close the current coding session with confirmation
@@ -343,7 +343,7 @@ class FileCog(commands.Cog):
             logger.error(f"Error in close_session: {e}", exc_info=True)
             await ctx.send(f"❌ Error closing session: {str(e)}")
     
-    @commands.command(name="readme", description="Show project README")
+    @commands.command(name="readme", description="プロジェクトのREADMEを表示します")
     async def show_readme(self, ctx: commands.Context):
         """
         Show project README

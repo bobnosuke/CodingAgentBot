@@ -159,12 +159,10 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
         await interaction.response.defer(ephemeral=True)
         
         try:
-            # メッセージ削除（Prefixコマンド時のセキュリティ対策）
-            if interaction.message and not interaction.is_interaction():
-                try:
-                    await interaction.message.delete()
-                except:
-                    pass
+            # Note: discord.Interaction object doesn't have is_interaction() method.
+            # For Modal on_submit, it's always an interaction.
+            # Prefix commands wouldn't trigger this Modal's on_submit directly.
+            pass
 
             db_session = self.db_manager.get_session()
             try:

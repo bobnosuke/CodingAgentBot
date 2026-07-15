@@ -219,18 +219,18 @@ class CodingCog(commands.Cog):
     
     coding_group = app_commands.Group(name="coding", description="AI coding commands")
     
-    @coding_group.command(name="panel", description="Show coding control panel")
+    @coding_group.command(name="panel", description="コーディング管理パネルを表示します")
     @PermissionManager.has_permission(PermissionLevel.ADMIN)
     async def coding_panel(self, interaction: discord.Interaction):
         """
-        Show coding control panel with Select Menu
+        コーディング管理パネルを表示します
         
         Args:
             interaction: Discord interaction
         """
         try:
             embed = discord.Embed(
-                title="🎮 Coding Control Panel",
+                title="🎮 コーディング管理パネル",
                 description="以下のメニューから操作を選択してください。",
                 color=discord.Color.blue()
             )
@@ -258,7 +258,8 @@ class CodingCog(commands.Cog):
             
             view = CodingPanelView(self.bot, interaction.user.id)
             
-            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            # ephemeral=False に変更（一般ユーザーも利用可能にするため）
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
         
         except Exception as e:
             logger.error(f"Error in coding_panel: {e}", exc_info=True)
@@ -267,14 +268,14 @@ class CodingCog(commands.Cog):
                 ephemeral=True
             )
     
-    @coding_group.command(name="start", description="Start a new coding session")
+    @coding_group.command(name="start", description="新しいコーディングセッションを開始します")
     async def coding_start(self, interaction: discord.Interaction, project_name: str = None):
         """
-        Start a new coding session
+        新しいコーディングセッションを開始します
         
         Args:
             interaction: Discord interaction
-            project_name: Optional project name
+            project_name: オプションのプロジェクト名
         """
         try:
             # Check if user already has active session
@@ -533,10 +534,10 @@ class CodingCog(commands.Cog):
                 ephemeral=True
             )
     
-    @coding_group.command(name="end", description="End your current coding session")
+    @coding_group.command(name="end", description="現在のコーディングセッションを終了します")
     async def coding_end(self, interaction: discord.Interaction):
         """
-        End the current coding session
+        現在のコーディングセッションを終了します
         
         Args:
             interaction: Discord interaction

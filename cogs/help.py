@@ -21,79 +21,77 @@ class HelpCog(commands.Cog):
         """
         self.bot = bot
     
-    @app_commands.command(name="guide", description="Show help guide")
+    @app_commands.command(name="guide", description="ヘルプガイドを表示します")
     async def guide_command(self, interaction: discord.Interaction, topic: str = None):
         """
-        Display help information
+        ヘルプ情報を表示します
         
         Args:
             interaction: Discord interaction
-            topic: Optional help topic
+            topic: オプションのヘルプトピック
         """
         if topic is None:
             # Main help menu
             embed = discord.Embed(
-                title="🤖 CoderAgent - Help Menu",
-                description="Discord AI Coding Assistant",
+                title="🤖 CoderAgent - ヘルプメニュー",
+                description="Discord AI コーディングアシスタント",
                 color=discord.Color.blue()
             )
             
             embed.add_field(
-                name="🔑 API Key Management",
-                value="• `/api-key register` - Register your OpenRouter API key\n"
-                      "• `/api-key remove` - Remove your API key",
+                name="⚙️ 設定",
+                value="• `/setting` - APIキーやAIモデルの設定を行います",
                 inline=False
             )
             
             embed.add_field(
-                name="💻 Coding Commands",
-                value="• `/coding start` - Start a new coding session\n"
-                      "• `/coding chat` - Chat with AI in your session\n"
-                      "• `/coding end` - End your current session",
+                name="💻 コーディングコマンド",
+                value="• `/coding start` - 新しいコーディングセッションを開始します\n"
+                      "• `/coding chat` - AIとチャットします（CodingRoom内では不要）\n"
+                      "• `/coding end` - セッションを終了します",
                 inline=False
             )
             
             embed.add_field(
-                name="📁 File Management",
-                value="• `/save` - Save a file\n"
-                      "• `/list` - List all files in session\n"
-                      "• `/get` - Get file content\n"
-                      "• `/download` - Download all files as ZIP",
+                name="📁 ファイル管理",
+                value="• `!save` - ファイルを保存します\n"
+                      "• `!list` - セッション内のファイル一覧を表示します\n"
+                      "• `!get` - ファイルの内容を取得します\n"
+                      "• `!download` - ファイルをZIPでダウンロードします",
                 inline=False
             )
             
             embed.add_field(
-                name="ℹ️ Information",
-                value="• `/guide` - Show this help menu\n"
-                      "• `/status` - Show bot status\n"
-                      "• `/about` - About CoderAgent",
+                name="ℹ️ 情報",
+                value="• `/guide` - このヘルプメニューを表示します\n"
+                      "• `/status` - Botのステータスを表示します\n"
+                      "• `/about` - CoderAgentについて",
                 inline=False
             )
             
-            embed.set_footer(text="Use /guide <topic> for more details on a specific topic")
+            embed.set_footer(text="特定のトピックについて詳しく知るには /guide <topic> を使用してください")
             
             await interaction.response.send_message(embed=embed)
         
-        elif topic.lower() == "api-key":
+        elif topic.lower() == "setting":
             embed = discord.Embed(
-                title="🔑 API Key Management",
+                title="⚙️ 設定",
                 color=discord.Color.blue()
             )
             
             embed.add_field(
-                name="Register API Key",
-                value="Use `/api-key register <your_openrouter_api_key>`\n"
-                      "Your API key is securely encrypted and stored.",
+                name="APIキーの登録",
+                value="`/setting` コマンドを実行し、表示される「API Key登録」ボタンから登録してください。\n"
+                      "APIキーは安全に暗号化されて保存されます。",
                 inline=False
             )
             
             embed.add_field(
-                name="How to get an API key?",
-                value="1. Visit https://openrouter.ai/\n"
-                      "2. Sign up or log in\n"
-                      "3. Go to API Keys section\n"
-                      "4. Create a new API key\n"
-                      "5. Copy and register it with the bot",
+                name="APIキーの取得方法",
+                value="1. https://openrouter.ai/ にアクセス\n"
+                      "2. サインアップまたはログイン\n"
+                      "3. API Keys セクションへ移動\n"
+                      "4. 新しいAPIキーを作成してコピー",
                 inline=False
             )
             
@@ -101,28 +99,28 @@ class HelpCog(commands.Cog):
         
         elif topic.lower() == "coding":
             embed = discord.Embed(
-                title="💻 Coding Commands",
+                title="💻 コーディングコマンド",
                 color=discord.Color.blue()
             )
             
             embed.add_field(
-                name="Start Session",
-                value="Use `/coding start [project_name]`\n"
-                      "Creates a private coding room for you.",
+                name="セッション開始",
+                value="`/coding start [project_name]` を使用します。\n"
+                      "あなた専用のプライベートな CodingRoom が作成されます。",
                 inline=False
             )
             
             embed.add_field(
-                name="Chat with AI",
-                value="Use `/coding chat <your_message>`\n"
-                      "Ask the AI to generate code, explain concepts, or debug.",
+                name="AIとチャット",
+                value="CodingRoom内では、メッセージを送信するだけでAIと対話できます。\n"
+                      "コード生成、解説、デバッグなどを依頼してください。",
                 inline=False
             )
             
             embed.add_field(
-                name="End Session",
-                value="Use `/coding end`\n"
-                      "Closes your session and deletes the coding room.",
+                name="セッション終了",
+                value="`/coding end` を使用します。\n"
+                      "セッションを終了し、CodingRoomを削除します。",
                 inline=False
             )
             
@@ -130,28 +128,28 @@ class HelpCog(commands.Cog):
         
         elif topic.lower() == "files":
             embed = discord.Embed(
-                title="📁 File Management",
+                title="📁 ファイル管理",
                 color=discord.Color.blue()
             )
             
             embed.add_field(
-                name="Save File",
-                value="Use `/save <filename> <content>`\n"
-                      "Save code or text to a file in your session.",
+                name="ファイルを保存",
+                value="`!save <ファイル名> <内容>` を使用します。\n"
+                      "セッション内にコードやテキストを保存できます。",
                 inline=False
             )
             
             embed.add_field(
-                name="List Files",
-                value="Use `/list`\n"
-                      "See all files in your current session.",
+                name="ファイル一覧",
+                value="`!list` を使用します。\n"
+                      "現在のセッション内の全ファイルを確認できます。",
                 inline=False
             )
             
             embed.add_field(
-                name="Download Files",
-                value="Use `/download`\n"
-                      "Download all session files as a ZIP archive.",
+                name="ダウンロード",
+                value="`!download` を使用します。\n"
+                      "セッション内のファイルをZIP形式で取得できます。",
                 inline=False
             )
             
@@ -159,72 +157,79 @@ class HelpCog(commands.Cog):
         
         else:
             await interaction.response.send_message(
-                f"❓ Unknown help topic: `{topic}`\nUse `/guide` for the main menu.",
+                f"❓ 不明なトピックです: `{topic}`\n`/guide` でメインメニューを表示してください。",
                 ephemeral=True
             )
     
-    @app_commands.command(name="about", description="About CoderAgent")
+    @app_commands.command(name="about", description="CoderAgentについて表示します")
     async def about_command(self, interaction: discord.Interaction):
         """
-        Display information about CoderAgent
+        CoderAgentに関する情報を表示します
         
         Args:
             interaction: Discord interaction
         """
-        embed = discord.Embed(
-            title="🤖 About CoderAgent",
-            description="Discord AI Coding Assistant",
-            color=discord.Color.blue()
-        )
-        
-        embed.add_field(
-            name="What is CoderAgent?",
-            value="CoderAgent is an AI-powered Discord bot that helps you write code. "
-                  "It provides an experience similar to Claude Code, but directly in Discord.",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="Features",
-            value="✨ AI Code Generation\n"
-                  "✨ Private Coding Rooms\n"
-                  "✨ Session Management\n"
-                  "✨ Secure API Key Storage\n"
-                  "✨ File Management",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="Technology",
-            value="Built with discord.py and OpenRouter API",
-            inline=False
-        )
-        
-        embed.add_field(
-            name="Getting Started",
-            value="1. Register your OpenRouter API key: `/api-key register <key>`\n"
-                  "2. Start a coding session: `/coding start`\n"
-                  "3. Chat with AI: `/coding chat <message>`",
-            inline=False
-        )
-        
-        await interaction.response.send_message(embed=embed)
+        try:
+            embed = discord.Embed(
+                title="🤖 CoderAgent について",
+                description="Discord AI コーディングアシスタント",
+                color=discord.Color.blue()
+            )
+            
+            embed.add_field(
+                name="CoderAgentとは？",
+                value="CoderAgentは、コード作成を支援するAI搭載のDiscord Botです。"
+                      "Claude Codeのような体験を、Discord上で直接提供します。",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="主な機能",
+                value="✨ AIによるコード生成\n"
+                      "✨ プライベートなコーディングルーム\n"
+                      "✨ セッション管理\n"
+                      "✨ 安全なAPIキーの暗号化保存\n"
+                      "✨ ファイル管理機能",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="使用テクノロジー",
+                value="Built with discord.py and OpenRouter API",
+                inline=False
+            )
+            
+            embed.add_field(
+                name="始め方",
+                value="1. APIキーを登録: `/setting` から登録\n"
+                      "2. セッションを開始: `/coding start`を実行\n"
+                      "3. AIと対話: CodingRoom内でメッセージを送信",
+                inline=False
+            )
+            
+            await interaction.response.send_message(embed=embed)
+        except Exception as e:
+            logger.error(f"Error in about command: {e}", exc_info=True)
+            if not interaction.response.is_done():
+                await interaction.response.send_message(f"❌ エラーが発生しました: {str(e)}", ephemeral=True)
+            else:
+                await interaction.followup.send(f"❌ エラーが発生しました: {str(e)}", ephemeral=True)
     
-    @app_commands.command(name="status", description="Show bot status")
+    @app_commands.command(name="status", description="Botのステータスを表示します")
     async def status_command(self, interaction: discord.Interaction):
         """
-        Display bot status
+        Botのステータスを表示します
         
         Args:
             interaction: Discord interaction
         """
         embed = discord.Embed(
-            title="📊 Bot Status",
+            title="📊 Bot ステータス",
             color=discord.Color.green()
         )
         
         embed.add_field(
-            name="Bot Name",
+            name="Bot名",
             value=self.bot.user.name,
             inline=True
         )
@@ -236,20 +241,20 @@ class HelpCog(commands.Cog):
         )
         
         embed.add_field(
-            name="Guilds",
+            name="サーバー数",
             value=len(self.bot.guilds),
             inline=True
         )
         
         embed.add_field(
-            name="Latency",
+            name="レイテンシ",
             value=f"{self.bot.latency * 1000:.0f}ms",
             inline=True
         )
         
         embed.add_field(
-            name="Status",
-            value="✅ Online",
+            name="状態",
+            value="✅ オンライン",
             inline=True
         )
         
