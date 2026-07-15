@@ -10,6 +10,7 @@ from modules.security.permissions import PermissionLevel, PermissionManager
 from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository
 from modules.session.manager import SessionManager
 from modules.ai.openrouter import OpenRouterClient, AIService
+import asyncio
 
 logger = setup_logger(__name__)
 
@@ -71,9 +72,7 @@ class CodingPanelView(discord.ui.View):
                 )
                 return
             
-            decrypted_key = self.bot.encryption_manager.decrypt(api_key.encrypted_key)
-            
-            # セッションIDを生成（manager側でも生成されるが、チャンネル名指定のためにここで取得）
+            # セッションIDを生成
             import uuid
             short_uuid = str(uuid.uuid4())[:8]
             channel_name = f"session-{short_uuid}"
@@ -82,13 +81,8 @@ class CodingPanelView(discord.ui.View):
                 db_session, 
                 interaction.user, 
                 interaction.guild, 
-                channel_name # チャンネル名としてセッションID（の一部）を渡す
+                channel_name
             )
-            
-            model_preset = getattr(user, "model_preset", "balance")
-            openrouter_client = OpenRouterClient(decrypted_key)
-            ai_service = AIService(openrouter_client)
-            ai_service.set_model_by_preset(model_preset)
             
             embed = discord.Embed(
                 title="✅ コーディングセッション開始",
@@ -132,10 +126,115 @@ class CodingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.session_manager = SessionManager(bot)
-        self.ai_services = {}
     
     coding_group = app_commands.Group(name="coding", description="AIコーディング関連のコマンド")
     
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Handle AI chat in CodingRooms"""
+        # Ignore bot messages
+        if message.author.bot:
+            return
+        
+        # Check if message is in a CodingRoom
+        channel_id = str(message.channel.id)
+        
+        # 1. Try to get from cache
+        session_uuid = None
+        for uuid, info in self.session_manager.active_sessions.items():
+            if info["channel_id"] == channel_id:
+                session_uuid = uuid
+                break
+        
+        # 2. If not in cache, try to restore from DB
+        if not session_uuid:
+            db_session = self.bot.db_manager.get_session()
+            try:
+                from sqlalchemy import select
+                from modules.database.models import Session
+                stmt = select(Session).where((Session.channel_id == channel_id) & (Session.is_active == True))
+                result = await db_session.execute(stmt)
+                db_session_obj = result.scalar_one_or_none()
+                
+                if db_session_obj:
+                    # Restore to cache
+                    session_uuid = db_session_obj.session_uuid
+                    self.session_manager.active_sessions[session_uuid] = {
+                        "user_id": db_session_obj.user_id,
+                        "discord_user_id": str(message.author.id), # Assuming the author is the session owner for now
+                        "guild_id": str(message.guild.id),
+                        "channel_id": channel_id,
+                        "db_session_id": db_session_obj.id
+                    }
+                    logger.info(f"Restored session {session_uuid} from DB for channel {channel_id}")
+            except Exception as e:
+                logger.error(f"Error restoring session from DB: {e}")
+            finally:
+                await db_session.close()
+
+        if not session_uuid:
+            return
+
+        # Check if it's a prefix command
+        if message.content.startswith(self.bot.command_prefix):
+            # Let the bot process commands
+            return
+
+        # Process AI Chat
+        async with message.channel.typing():
+            db_session = self.bot.db_manager.get_session()
+            try:
+                session_info = self.session_manager.active_sessions[session_uuid]
+                user = await UserRepository.get_user_by_discord_id(db_session, str(message.author.id))
+                api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
+                
+                if not api_key:
+                    await message.reply("❌ APIキーが設定されていません。`/setting` で設定してください。")
+                    return
+                
+                decrypted_key = self.bot.encryption_manager.decrypt(api_key.encrypted_key)
+                
+                # Get conversation history
+                history = await MessageRepository.get_session_messages(db_session, session_info["db_session_id"])
+                formatted_history = [{"role": m.role, "content": m.content} for m in history[-10:]] # Last 10 messages
+                
+                # Initialize AI service
+                client = OpenRouterClient(decrypted_key)
+                ai_service = AIService(client)
+                ai_service.set_model_by_preset(getattr(user, "model_preset", "balance"))
+                
+                # Save user message
+                await MessageRepository.add_message(db_session, session_info["db_session_id"], "user", message.content)
+                
+                # Send initial response message
+                response_msg = await message.reply("🤔 思考中...")
+                
+                full_response = ""
+                chunk_counter = 0
+                
+                async for chunk in ai_service.chat(message.content, formatted_history):
+                    full_response += chunk
+                    chunk_counter += 1
+                    
+                    # Update message every 10 chunks to avoid rate limit
+                    if chunk_counter % 15 == 0:
+                        await response_msg.edit(content=full_response + " ▌")
+                
+                # Final edit
+                if full_response:
+                    await response_msg.edit(content=full_response)
+                    # Save AI response
+                    await MessageRepository.add_message(db_session, session_info["db_session_id"], "assistant", full_response)
+                else:
+                    await response_msg.edit(content="⚠️ AIからの応答が空でした。もう一度お試しください。")
+                
+                await db_session.commit()
+            except Exception as e:
+                logger.error(f"Error in AI chat: {e}", exc_info=True)
+                await message.reply(f"❌ エラーが発生しました: {str(e)}")
+            finally:
+                await db_session.close()
+
     @coding_group.command(name="panel", description="コーディング管理パネルを表示します")
     @PermissionManager.has_permission(PermissionLevel.ADMIN)
     async def coding_panel(self, interaction: discord.Interaction):
@@ -168,8 +267,6 @@ class CodingCog(commands.Cog):
             if not api_key:
                 await interaction.followup.send("❌ OpenRouterのAPIキーが見つかりません！", ephemeral=True)
                 return
-            
-            decrypted_key = self.bot.encryption_manager.decrypt(api_key.encrypted_key)
             
             import uuid
             short_uuid = str(uuid.uuid4())[:8]

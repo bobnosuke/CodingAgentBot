@@ -68,13 +68,13 @@ class SessionManager:
                 project_name or default_name
             )
             
-            # Create session in database
+            # Create session in database with channel_id
             db_session_obj = await SessionRepository.create_session(
                 db_session,
                 session_uuid,
                 user.id,
                 str(guild.id),
-                str(coding_room.id),
+                str(coding_room.id), # Store channel_id in DB
                 project_name or default_name
             )
             
@@ -88,7 +88,7 @@ class SessionManager:
                 "db_session_id": db_session_obj.id
             }
             
-            logger.info(f"Created session {session_uuid} for {discord_user.name}")
+            logger.info(f"Created session {session_uuid} for {discord_user.name} in channel {coding_room.id}")
             return session_uuid, coding_room
         
         except Exception as e:
@@ -170,19 +170,36 @@ class SessionManager:
             delete_channel: Whether to delete the CodingRoom channel
         """
         try:
-            if session_uuid not in self.active_sessions:
-                logger.warning(f"Session {session_uuid} not found in cache")
+            # 1. Try cache first, then DB
+            session_info = self.active_sessions.get(session_uuid)
+            db_session_id = None
+            channel_id = None
+
+            if session_info:
+                db_session_id = session_info["db_session_id"]
+                channel_id = session_info["channel_id"]
+            else:
+                # Try to find in DB
+                from sqlalchemy import select
+                from modules.database.models import Session
+                stmt = select(Session).where(Session.session_uuid == session_uuid)
+                result = await db_session.execute(stmt)
+                db_session_obj = result.scalar_one_or_none()
+                if db_session_obj:
+                    db_session_id = db_session_obj.id
+                    channel_id = db_session_obj.channel_id
+
+            if not db_session_id:
+                logger.warning(f"Session {session_uuid} not found")
                 return
             
-            session_info = self.active_sessions[session_uuid]
-            
             # Close session in database
-            await SessionRepository.close_session(db_session, session_info["db_session_id"])
+            await SessionRepository.close_session(db_session, db_session_id)
             
             # Delete CodingRoom channel if requested
-            if delete_channel:
+            if delete_channel and channel_id:
                 try:
-                    channel = self.bot.get_channel(int(session_info["channel_id"]))
+                    channel = self.bot.get_channel(int(channel_id))
                     if channel:
                         await channel.delete()
                         logger.info(f"Deleted CodingRoom channel: {channel.name}")
@@ -190,7 +207,8 @@ class SessionManager:
                     logger.error(f"Failed to delete channel: {e}")
             
             # Remove from cache
-            del self.active_sessions[session_uuid]
+            if session_uuid in self.active_sessions:
+                del self.active_sessions[session_uuid]
             
             logger.info(f"Closed session {session_uuid}")
         
