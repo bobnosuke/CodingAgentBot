@@ -90,4 +90,4 @@ CoderAgent/
 MIT License
 
 ---
-**Made with ❤️ by CoderAgent Team**
+**Made with ❤️ by Rovaex Team**
