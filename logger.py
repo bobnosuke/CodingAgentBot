@@ -42,6 +42,9 @@ def setup_logger(name: str) -> logging.Logger:
     console_handler.setFormatter(simple_formatter)
     logger.addHandler(console_handler)
     
+    # Ensure log directory exists
+    Config.LOGS_DIR.mkdir(parents=True, exist_ok=True)
+
     # File handler with rotation
     file_handler = logging.handlers.RotatingFileHandler(
         Config.LOG_FILE,
