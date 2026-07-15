@@ -26,7 +26,7 @@ class CoderAgent(commands.Bot):
         # Setup intents
         intents = discord.Intents.default()
         intents.message_content = True
-        intents.members = False
+        intents.members = True
         intents.guilds = True
         
         # Initialize parent class
