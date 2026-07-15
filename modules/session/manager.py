@@ -40,7 +40,7 @@ class SessionManager:
             db_session: Database session
             discord_user: Discord user
             guild: Discord guild
-            project_name: Optional project name
+            project_name: Optional project name (used as channel name)
         
         Returns:
             Tuple of (session_uuid, coding_room_channel)
@@ -58,10 +58,8 @@ class SessionManager:
             short_uuid = str(uuid.uuid4())[:8]
             session_uuid = f"{discord_user.id}-{short_uuid}"
             
-            # Get user's session count for naming
-            user_session_count = await SessionRepository.count_user_sessions(db_session, user.id)
-            session_num = str(user_session_count + 1).zfill(4)
-            default_name = f"{discord_user.id}-{session_num}"
+            # Default room name if not provided
+            default_name = f"session-{short_uuid}"
             
             # Create CodingRoom channel
             coding_room = await self._create_coding_room(
@@ -77,7 +75,7 @@ class SessionManager:
                 user.id,
                 str(guild.id),
                 str(coding_room.id),
-                project_name
+                project_name or default_name
             )
             
             # Cache session
@@ -147,7 +145,7 @@ class SessionManager:
                 name=room_name.lower().replace(" ", "-")[:100],
                 category=category,
                 overwrites=overwrites,
-                topic=f"Coding session for {user.name}"
+                topic=f"{user.name} さんのコーディングセッション用チャンネルです。"
             )
             
             logger.info(f"Created CodingRoom channel: {channel.name} ({channel.id})")

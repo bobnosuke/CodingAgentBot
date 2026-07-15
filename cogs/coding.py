@@ -18,7 +18,6 @@ class CodingPanelView(discord.ui.View):
     """Persistent View for /coding panel (Public Panel)"""
     
     def __init__(self, bot: commands.Bot):
-        # 永続化のためにtimeout=Noneを設定
         super().__init__(timeout=None)
         self.bot = bot
         self.session_manager = SessionManager(bot)
@@ -31,7 +30,7 @@ class CodingPanelView(discord.ui.View):
             discord.SelectOption(label="プロジェクト詳細", value="info", emoji="ℹ️", description="プロジェクトの詳細情報を確認します"),
             discord.SelectOption(label="プロジェクト名変更", value="rename", emoji="✏️", description="プロジェクト名を変更します"),
         ],
-        custom_id="persistent:coding_panel_select"  # custom_idを固定
+        custom_id="persistent:coding_panel_select"
     )
     async def panel_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         """Handle selection from Public Panel"""
@@ -54,8 +53,8 @@ class CodingPanelView(discord.ui.View):
         
         if active_session:
             await interaction.followup.send(
-                f"❌ You already have an active session: `{active_session[:8]}`\n"
-                f"Use `/coding end` to close it first.",
+                f"❌ すでにアクティブなセッションがあります: `{active_session[:8]}`\n"
+                f"新しく開始する前に `/coding end` で終了してください。",
                 ephemeral=True
             )
             return
@@ -67,13 +66,24 @@ class CodingPanelView(discord.ui.View):
             
             if not api_key:
                 await interaction.followup.send(
-                    "❌ No OpenRouter API key found!\nPlease register your API key first using `/setting`",
+                    "❌ OpenRouterのAPIキーが見つかりません！\n先に `/setting` からAPIキーを登録してください。",
                     ephemeral=True
                 )
                 return
             
             decrypted_key = self.bot.encryption_manager.decrypt(api_key.encrypted_key)
-            session_uuid, coding_room = await self.session_manager.create_session(db_session, interaction.user, interaction.guild, "New Project")
+            
+            # セッションIDを生成（manager側でも生成されるが、チャンネル名指定のためにここで取得）
+            import uuid
+            short_uuid = str(uuid.uuid4())[:8]
+            channel_name = f"session-{short_uuid}"
+            
+            session_uuid, coding_room = await self.session_manager.create_session(
+                db_session, 
+                interaction.user, 
+                interaction.guild, 
+                channel_name # チャンネル名としてセッションID（の一部）を渡す
+            )
             
             model_preset = getattr(user, "model_preset", "balance")
             openrouter_client = OpenRouterClient(decrypted_key)
@@ -81,26 +91,28 @@ class CodingPanelView(discord.ui.View):
             ai_service.set_model_by_preset(model_preset)
             
             embed = discord.Embed(
-                title="✅ Coding Session Started",
-                description=f"Your private coding room has been created!",
+                title="✅ コーディングセッション開始",
+                description=f"あなた専用のコーディングルームを作成しました！",
                 color=discord.Color.green()
             )
-            embed.add_field(name="Session ID", value=f"`{session_uuid[:8]}`", inline=False)
-            embed.add_field(name="Channel", value=coding_room.mention, inline=False)
+            embed.add_field(name="セッションID", value=f"`{session_uuid[:8]}`", inline=False)
+            embed.add_field(name="チャンネル", value=coding_room.mention, inline=False)
             embed.set_footer(text="Made by RovaexTeam")
             
             await interaction.followup.send(embed=embed, ephemeral=True)
             
+            # Coding Room welcome
             welcome_embed = discord.Embed(
-                title="🤖 Welcome to your Coding Session",
-                description="I'm your AI coding assistant. Tell me what you'd like to build!",
+                title="🤖 コーディングセッションへようこそ",
+                description="私はあなたのAIコーディングアシスタントです。何を作りたいか教えてください！",
                 color=discord.Color.blue()
             )
+            welcome_embed.add_field(name="ヒント", value="・作りたい機能や修正したいコードをチャットしてください。\n・`!download` で作成したファイルをダウンロードできます。\n・`/coding end` でセッションを終了できます。", inline=False)
             welcome_embed.set_footer(text="Made by RovaexTeam")
             await coding_room.send(embed=welcome_embed)
         except Exception as e:
             logger.error(f"Error in _handle_start: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ Error starting session: {str(e)}", ephemeral=True)
+            await interaction.followup.send(f"❌ セッション開始中にエラーが発生しました: {str(e)}", ephemeral=True)
         finally:
             await db_session.close()
     
@@ -122,7 +134,7 @@ class CodingCog(commands.Cog):
         self.session_manager = SessionManager(bot)
         self.ai_services = {}
     
-    coding_group = app_commands.Group(name="coding", description="AI coding commands")
+    coding_group = app_commands.Group(name="coding", description="AIコーディング関連のコマンド")
     
     @coding_group.command(name="panel", description="コーディング管理パネルを表示します")
     @PermissionManager.has_permission(PermissionLevel.ADMIN)
@@ -134,7 +146,6 @@ class CodingCog(commands.Cog):
             color=discord.Color.blue()
         )
         embed.set_footer(text="Made by RovaexTeam")
-        # 永続Viewを使用
         view = CodingPanelView(self.bot)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
     
@@ -145,7 +156,7 @@ class CodingCog(commands.Cog):
         active_session = self.session_manager.get_user_active_session(user_id)
         
         if active_session:
-            await interaction.response.send_message(f"❌ You already have an active session: `{active_session[:8]}`", ephemeral=True)
+            await interaction.response.send_message(f"❌ すでにアクティブなセッションがあります: `{active_session[:8]}`", ephemeral=True)
             return
         
         await interaction.response.defer(ephemeral=True)
@@ -155,21 +166,40 @@ class CodingCog(commands.Cog):
             api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
             
             if not api_key:
-                await interaction.followup.send("❌ No OpenRouter API key found!", ephemeral=True)
+                await interaction.followup.send("❌ OpenRouterのAPIキーが見つかりません！", ephemeral=True)
                 return
             
             decrypted_key = self.bot.encryption_manager.decrypt(api_key.encrypted_key)
-            session_uuid, coding_room = await self.session_manager.create_session(db_session, interaction.user, interaction.guild, project_name or "New Project")
+            
+            import uuid
+            short_uuid = str(uuid.uuid4())[:8]
+            channel_name = project_name or f"session-{short_uuid}"
+            
+            session_uuid, coding_room = await self.session_manager.create_session(
+                db_session, 
+                interaction.user, 
+                interaction.guild, 
+                channel_name
+            )
             
             embed = discord.Embed(
-                title="✅ Coding Session Started",
-                description=f"Your private coding room has been created!",
+                title="✅ コーディングセッション開始",
+                description=f"あなた専用のコーディングルームを作成しました！",
                 color=discord.Color.green()
             )
-            embed.add_field(name="Channel", value=coding_room.mention, inline=False)
+            embed.add_field(name="チャンネル", value=coding_room.mention, inline=False)
             embed.set_footer(text="Made by RovaexTeam")
             
             await interaction.followup.send(embed=embed, ephemeral=True)
+            
+            # Coding Room welcome
+            welcome_embed = discord.Embed(
+                title="🤖 コーディングセッションへようこそ",
+                description="私はあなたのAIコーディングアシスタントです。何を作りたいか教えてください！",
+                color=discord.Color.blue()
+            )
+            welcome_embed.set_footer(text="Made by RovaexTeam")
+            await coding_room.send(embed=welcome_embed)
         finally:
             await db_session.close()
 
@@ -180,7 +210,7 @@ class CodingCog(commands.Cog):
         session_uuid = self.session_manager.get_user_active_session(user_id)
         
         if not session_uuid:
-            await interaction.response.send_message("❌ You don't have an active session.", ephemeral=True)
+            await interaction.response.send_message("❌ アクティブなセッションが見つかりません。", ephemeral=True)
             return
         
         embed = discord.Embed(
@@ -203,7 +233,14 @@ class CodingCog(commands.Cog):
                     await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
                     return
                 
-                await self.session_manager.end_session(self.session_uuid)
+                # データベースセッションを取得して終了処理
+                db_session = self.session_manager.bot.db_manager.get_session()
+                try:
+                    await self.session_manager.close_session(db_session, self.session_uuid)
+                    await db_session.commit()
+                finally:
+                    await db_session.close()
+                
                 await interaction.response.edit_message(content="✅ セッションを終了しました。", embed=None, view=None)
             
             @discord.ui.button(label="いいえ", style=discord.ButtonStyle.secondary, emoji="❌")
