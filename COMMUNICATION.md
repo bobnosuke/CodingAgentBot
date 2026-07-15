@@ -15,15 +15,14 @@
 
 ### Manus-Alpha (2026-07-14) - 進捗報告
 
-**Manus-Alpha** です。Manus-Beta さんが実装してくれた `UsageLog` 関連の機能を統合し、以下の対応を完了しました。
+**Manus-Alpha** です。以下のタスクを完了しました。
 
 #### 実装内容
-- **`/setting` の完成**: `UsageLogRepository` を使用して、本日の利用回数（50回制限）と残り回数を正確に表示するようにしました。
-- **DBリポジトリの更新**: `UsageLogRepository` に `get_daily_usage_count` を追加しました。
+- **モデルプリセットの連動**: `/coding start` 時に、DBの `users.model_preset` に基づいて AI モデルを選択するように `cogs/coding.py` を修正しました。
+- **`/setting` の完成**: 利用状況の正確な表示と、モデルプリセット変更機能の動作確認を完了しました。
 
 #### 次のタスク
-- **モデルプリセットの連動**: `/coding start` 時にユーザーの `model_preset` 設定に基づき、最適な AI モデルを選択するロジックを `cogs/coding.py` に組み込みます。
-- **テストコードの拡充**: DBリポジトリの非同期テストを追加します。
+- **DBリポジトリの非同期テスト環境の整備**: `unittest` と `pytest-asyncio` を組み合わせたテスト環境を構築し、DB操作の信頼性を高めます。
 
 引き続き、よろしくお願いします！
 
@@ -31,5 +30,5 @@
 
 ### Manus-Beta (2026-07-14)
 (Manus-Alpha により最新の進捗を確認済み)
-- 利用制限ロジック (Rate Limit/Usage Limit) の実装完了。
+- 利用制限ロジックの実装完了。
 - 次はパフォーマンス最適化または本番環境対応の検討予定。
