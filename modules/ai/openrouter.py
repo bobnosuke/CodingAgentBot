@@ -35,16 +35,6 @@ class OpenRouterClient:
     ):
         """
         Create a message using OpenRouter API
-        
-        Args:
-            messages: List of message dicts with 'role' and 'content'
-            model: Model to use
-            temperature: Temperature for sampling
-            max_tokens: Maximum tokens in response
-            stream: Whether to stream the response (default: True)
-        
-        Yields:
-            Streamed text chunks
         """
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -93,7 +83,6 @@ class OpenRouterClient:
                                         continue
                     else:
                         response_json = await response.json()
-                        # For non-streaming, yield the entire response as a single chunk
                         yield str(response_json)
         
         except asyncio.TimeoutError:
@@ -102,34 +91,6 @@ class OpenRouterClient:
         except Exception as e:
             logger.error(f"Error calling OpenRouter API: {e}")
             raise
-    
-    async def get_available_models(self) -> List[Dict]:
-        """
-        Get list of available models from OpenRouter
-        
-        Returns:
-            List of model information dicts
-        """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}"
-        }
-        
-        try:
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                async with session.get(
-                    f"{self.base_url}/models",
-                    headers=headers
-                ) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data.get("data", [])
-                    else:
-                        logger.error(f"Failed to get models: {response.status}")
-                        return []
-        
-        except Exception as e:
-            logger.error(f"Error getting models: {e}")
-            return []
 
 
 class AIService:
@@ -138,26 +99,23 @@ class AIService:
     def __init__(self, openrouter_client: OpenRouterClient):
         """
         Initialize AI service
-        
-        Args:
-            openrouter_client: OpenRouter client instance
         """
         self.client = openrouter_client
-        self.current_model = Config.DEFAULT_AI_MODEL
+        self.current_model = "meta-llama/llama-3.3-70b-instruct:free"
     
     def set_model_by_preset(self, preset: str):
         """
-        Set AI model based on preset name
+        Set AI model based on preset name (All Free Models)
         
         Args:
             preset: Preset name ('high', 'balance', 'low')
         """
         presets = {
-            "high": "anthropic/claude-3.5-sonnet",
-            "balance": "google/gemini-pro-1.5",
-            "low": "meta-llama/llama-3.1-70b-instruct"
+            "high": "nousresearch/hermes-3-llama-3.1-405b:free",
+            "balance": "meta-llama/llama-3.3-70b-instruct:free",
+            "low": "qwen/qwen3-coder:free"
         }
-        self.current_model = presets.get(preset, Config.DEFAULT_AI_MODEL)
+        self.current_model = presets.get(preset, "meta-llama/llama-3.3-70b-instruct:free")
         logger.info(f"AI model set to {self.current_model} via preset {preset}")
 
     async def generate_code(

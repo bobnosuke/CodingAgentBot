@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from logger import setup_logger
-from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, UsageLogRepository
+from modules.database.repository import UserRepository, APIKeyRepository, UsageLogRepository
 from modules.utils.i18n import i18n
 import asyncio
 
@@ -158,35 +158,56 @@ class LanguageSelectionView(discord.ui.View):
 
 
 class ModelSelectionView(discord.ui.View):
-    def __init__(self, bot, lang):
-        super().__init__(timeout=60)
+    """View for selecting AI model via Select menu"""
+    def __init__(self, bot: commands.Bot, lang: str):
+        super().__init__(timeout=300)
         self.bot = bot
         self.lang = lang
+        
+        # Add model select menu
+        self.model_select = discord.ui.Select(
+            placeholder=i18n.translate(lang, "SETTING.SELECT_PLACEHOLDER"),
+            options=[
+                discord.SelectOption(
+                    label=i18n.translate(lang, "SETTING.MODEL_HIGH_LABEL"), 
+                    value="high", 
+                    emoji="🚀", 
+                    description=i18n.translate(lang, "SETTING.MODEL_HIGH_DESC")
+                ),
+                discord.SelectOption(
+                    label=i18n.translate(lang, "SETTING.MODEL_BALANCE_LABEL"), 
+                    value="balance", 
+                    emoji="⚖️", 
+                    description=i18n.translate(lang, "SETTING.MODEL_BALANCE_DESC")
+                ),
+                discord.SelectOption(
+                    label=i18n.translate(lang, "SETTING.MODEL_LOW_LABEL"), 
+                    value="low", 
+                    emoji="💻", 
+                    description=i18n.translate(lang, "SETTING.MODEL_LOW_DESC")
+                ),
+            ]
+        )
+        self.model_select.callback = self.model_select_callback
+        self.add_item(self.model_select)
 
-    @discord.ui.button(label="High Performance", style=discord.ButtonStyle.secondary, emoji="🚀")
-    async def high_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._set_model(interaction, "high")
-
-    @discord.ui.button(label="Balanced", style=discord.ButtonStyle.secondary, emoji="⚖️")
-    async def balance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._set_model(interaction, "balance")
-
-    @discord.ui.button(label="Cost Efficient", style=discord.ButtonStyle.secondary, emoji="💰")
-    async def low_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await self._set_model(interaction, "low")
-
-    async def _set_model(self, interaction: discord.Interaction, preset: str):
+    async def model_select_callback(self, interaction: discord.Interaction):
+        preset = self.model_select.values[0]
         db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
             user.model_preset = preset
             await db_session.commit()
             
-            model_name = i18n.translate(self.lang, f"SETTING.MODEL_{preset.upper()}")
-            msg = i18n.translate(self.lang, "SETTING.MODEL_SET_SUCCESS", model=model_name)
+            msg = i18n.translate(self.lang, "SETTING.MODEL_SET_SUCCESS", model=preset.capitalize())
             await interaction.response.edit_message(content=msg, embed=None, view=None)
         finally:
             await db_session.close()
+
+    @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary, row=1)
+    async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        view = SettingDetailView(self.bot, self.lang)
+        await interaction.response.edit_message(content=None, view=view)
 
 
 class APIKeyModal(discord.ui.Modal):
@@ -258,10 +279,6 @@ class SettingCog(commands.Cog):
     @app_commands.command(
         name="setting", 
         description="Configure bot settings"
-    )
-    @app_commands.describe(
-        # We can't use locale_str in name/description of command itself easily without causing validation errors,
-        # but the Translator will handle the name "setting" and its description automatically.
     )
     async def setting(self, interaction: discord.Interaction):
         """Show User Settings Panel (Public Start Button)"""
