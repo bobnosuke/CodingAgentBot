@@ -21,7 +21,7 @@
 | 7  | パフォーマンス最適化 | 未定 | ⬜ 未着手 | キャッシング、非同期最適化 |
 | 8  | Prefix Command (!coding 等) の実装 | Manus-Beta | ✅ 完了 | 全コマンドのハイブリッド化完了 |
 | 9  | (ID 5へ統合) | - | - | - |
-| 10 | 利用制限 (Rate Limit / Usage Limit) の実装 | Manus-Beta | 🚧 進行中 | 要件定義書 28 参照 |
+| 10 | 利用制限 (Rate Limit / Usage Limit) の実装 | Manus-Beta | ✅ 完了 | 1日50回/8秒間隔の制限実装完了 |
 | 11 | サーバー設定 (Guild Settings) の永続化 | Manus-iCloud | ⬜ 未着手 | /config の DB 連携 |
 
 ---
