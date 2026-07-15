@@ -14,7 +14,7 @@ class Config:
     # Discord
     DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
     BOT_PREFIX = os.getenv("BOT_PREFIX", "!")
-    BOT_OWNER_ID = os.getenv("BOT_OWNER_ID")
+    BOT_OWNER_ID = os.getenv("OWNER_ID")
     
     # OpenRouter API
     OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
