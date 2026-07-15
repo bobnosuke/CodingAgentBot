@@ -1,3 +1,7 @@
+"""
+User settings commands for CoderAgent
+Handles API key management and model selection
+"""
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -5,16 +9,19 @@ import logging
 from typing import Optional
 
 from modules.database.repository import UserRepository, APIKeyRepository, UsageLogRepository
-from modules.security.permissions import PermissionLevel, has_permission
+from modules.security.permissions import PermissionLevel, PermissionManager
 from modules.database.database import DatabaseManager
 from modules.security.encryption import EncryptionManager
+from logger import setup_logger
 
-logger = logging.getLogger("CoderAgent")
+logger = setup_logger(__name__)
+
 
 class SettingView(discord.ui.View):
     """View for /setting command with select menu"""
+    
     def __init__(self, user_id: int, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.user_id = user_id
         self.db_manager = db_manager
         self.encryption_manager = encryption_manager
@@ -29,71 +36,112 @@ class SettingView(discord.ui.View):
         ]
     )
     async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
+        """Handle setting selection"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
             return
 
         value = select.values[0]
         
-        if value == "api_key":
-            await interaction.response.send_modal(APIKeyModal(self.api_repo))
-        elif value == "model":
-            await self.show_model_selection(interaction)
-        elif value == "status":
-            await self.show_status(interaction)
-        elif value == "delete_key":
-            await self.confirm_delete_key(interaction)
+        try:
+            if value == "api_key":
+                await interaction.response.send_modal(APIKeyModal(self.db_manager, self.encryption_manager))
+            elif value == "model":
+                await self.show_model_selection(interaction)
+            elif value == "status":
+                await self.show_status(interaction)
+            elif value == "delete_key":
+                await self.confirm_delete_key(interaction)
+        except Exception as e:
+            logger.error(f"Error in select_callback: {e}", exc_info=True)
+            await interaction.response.send_message(
+                f"❌ エラーが発生しました: {str(e)}",
+                ephemeral=True
+            )
 
     async def show_model_selection(self, interaction: discord.Interaction):
-        view = ModelSelectionView(self.user_id, self.user_repo)
-        embed = discord.Embed(
-            title="🤖 使用モデル変更",
-            description="利用するAIモデルのプリセットを選択してください。",
-            color=discord.Color.blue()
-        )
-        embed.add_field(name="🚀 高品質", value="大規模開発、複雑な設計に最適", inline=False)
-        embed.add_field(name="⚖️ バランス（推奨）", value="通常開発、コード修正に最適", inline=False)
-        embed.add_field(name="💰 節約", value="簡単な質問、軽量コード生成に最適", inline=False)
-        
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        """Show model selection menu"""
+        try:
+            view = ModelSelectionView(self.user_id, self.db_manager)
+            embed = discord.Embed(
+                title="🤖 使用モデル変更",
+                description="利用するAIモデルのプリセットを選択してください。",
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="🚀 高品質", value="大規模開発、複雑な設計に最適", inline=False)
+            embed.add_field(name="⚖️ バランス（推奨）", value="通常開発、コード修正に最適", inline=False)
+            embed.add_field(name="💰 節約", value="簡単な質問、軽量コード生成に最適", inline=False)
+            embed.set_footer(text="Made by RovaexTeam")
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error in show_model_selection: {e}", exc_info=True)
+            await interaction.response.send_message(
+                f"❌ エラーが発生しました: {str(e)}",
+                ephemeral=True
+            )
 
     async def show_status(self, interaction: discord.Interaction):
-        async with get_db_session() as session:
-            from modules.database.repository import UsageLogRepository
-            user_repo = UserRepository(session)
-            usage_repo = UsageLogRepository()
+        """Show usage status"""
+        try:
+            await interaction.response.defer(ephemeral=True)
             
-            db_user = await user_repo.get_user_by_discord_id(session, str(interaction.user.id))
-            
-            if not db_user:
-                await interaction.response.send_message("ユーザー情報が見つかりません。まずはコマンドを実行してください。", ephemeral=True)
-                return
+            db_session = self.db_manager.get_session()
+            try:
+                db_user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
+                
+                if not db_user:
+                    await interaction.followup.send("ユーザー情報が見つかりません。まずはコマンドを実行してください。", ephemeral=True)
+                    return
 
-            # 本日の利用回数を取得
-            daily_count = await usage_repo.get_daily_usage_count(session, db_user.id)
-            limit = 50  # 要件定義書の制限
-            remaining = max(0, limit - daily_count)
-            
-            embed = discord.Embed(
-                title="📊 利用状況確認",
-                color=discord.Color.green()
+                # 本日の利用回数を取得
+                daily_count = await UsageLogRepository.get_daily_usage_count(db_session, db_user.id)
+                limit = 50  # 要件定義書の制限
+                remaining = max(0, limit - daily_count)
+                
+                embed = discord.Embed(
+                    title="📊 利用状況確認",
+                    color=discord.Color.green()
+                )
+                embed.add_field(name="使用モデル", value=getattr(db_user, "model_preset", "balance").capitalize(), inline=True)
+                embed.add_field(name="本日の利用回数", value=f"{daily_count} / {limit}", inline=True)
+                embed.add_field(name="残り利用回数", value=str(remaining), inline=True)
+                embed.set_footer(text="Made by RovaexTeam")
+                
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            finally:
+                await db_session.close()
+        except Exception as e:
+            logger.error(f"Error in show_status: {e}", exc_info=True)
+            await interaction.followup.send(
+                f"❌ エラーが発生しました: {str(e)}",
+                ephemeral=True
             )
-            embed.add_field(name="使用モデル", value=db_user.model_preset.capitalize(), inline=True)
-            embed.add_field(name="本日の利用回数", value=f"{daily_count} / {limit}", inline=True)
-            embed.add_field(name="残り利用回数", value=str(remaining), inline=True)
-            
-            await interaction.response.send_message(embed=embed, ephemeral=True)
 
     async def confirm_delete_key(self, interaction: discord.Interaction):
-        view = DeleteConfirmView(self.user_id, self.api_repo)
-        await interaction.response.send_message(
-            "⚠️ **警告**: 登録済みのAPIキーを削除しますか？削除後はコーディング機能が利用できなくなります。",
-            view=view,
-            ephemeral=True
-        )
+        """Confirm API key deletion"""
+        try:
+            view = DeleteConfirmView(self.user_id, self.db_manager, self.encryption_manager)
+            embed = discord.Embed(
+                title="⚠️ API Key 削除確認",
+                description="登録済みのAPIキーを削除しますか？削除後はコーディング機能が利用できなくなります。",
+                color=discord.Color.red()
+            )
+            embed.set_footer(text="Made by RovaexTeam")
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error in confirm_delete_key: {e}", exc_info=True)
+            await interaction.response.send_message(
+                f"❌ エラーが発生しました: {str(e)}",
+                ephemeral=True
+            )
+
 
 class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
-    api_key = discord.ui.TextInput(
+    """Modal for API key input"""
+    
+    api_key_input = discord.ui.TextInput(
         label="API Key",
         placeholder="sk-or-v1-...",
         min_length=10,
@@ -107,6 +155,7 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
         self.encryption_manager = encryption_manager
 
     async def on_submit(self, interaction: discord.Interaction):
+        """Handle API key submission"""
         await interaction.response.defer(ephemeral=True)
         
         try:
@@ -117,12 +166,10 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
                 except:
                     pass
 
-            async with self.db_manager.get_session() as session:
-                user_repo = UserRepository(session)
-                api_repo = APIKeyRepository(session)
-                
-                db_user = await user_repo.get_or_create_user(
-                    session,
+            db_session = self.db_manager.get_session()
+            try:
+                db_user = await UserRepository.get_or_create_user(
+                    db_session,
                     str(interaction.user.id),
                     interaction.user.name,
                     interaction.user.discriminator
@@ -131,110 +178,216 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
                 # 暗号化して保存
                 encrypted_key = self.encryption_manager.encrypt(self.api_key_input.value)
                 
-                await api_repo.set_key(session, db_user.id, encrypted_key)
-                await session.commit()
-
-            await interaction.followup.send("✅ APIキーを暗号化して保存しました。これよりコーディング機能が利用可能です。", ephemeral=True)
+                await APIKeyRepository.create_api_key(
+                    db_session,
+                    db_user.id,
+                    encrypted_key,
+                    "Default"
+                )
+                
+                embed = discord.Embed(
+                    title="✅ API Key 保存完了",
+                    description="APIキーを暗号化して保存しました。これよりコーディング機能が利用可能です。",
+                    color=discord.Color.green()
+                )
+                embed.set_footer(text="Made by RovaexTeam")
+                
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            finally:
+                await db_session.close()
         except Exception as e:
-            logger.error(f"Error saving API key: {e}")
-            await interaction.followup.send("❌ APIキーの保存中にエラーが発生しました。", ephemeral=True)
+            logger.error(f"Error saving API key: {e}", exc_info=True)
+            embed = discord.Embed(
+                title="❌ エラー",
+                description=f"APIキーの保存中にエラーが発生しました: {str(e)}",
+                color=discord.Color.red()
+            )
+            embed.set_footer(text="Made by RovaexTeam")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 class ModelSelectionView(discord.ui.View):
+    """View for model selection"""
+    
     def __init__(self, user_id: int, db_manager: DatabaseManager):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.user_id = user_id
         self.db_manager = db_manager
 
     @discord.ui.button(label="高品質", style=discord.ButtonStyle.primary, emoji="🚀")
     async def high_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Select high quality model"""
         await self.update_model(interaction, "high")
 
     @discord.ui.button(label="バランス", style=discord.ButtonStyle.success, emoji="⚖️")
     async def balance_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Select balanced model"""
         await self.update_model(interaction, "balance")
 
     @discord.ui.button(label="節約", style=discord.ButtonStyle.secondary, emoji="💰")
     async def low_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Select economy model"""
         await self.update_model(interaction, "low")
 
     async def update_model(self, interaction: discord.Interaction, model_preset: str):
+        """Update user's model preset"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
             return
 
-        async with self.db_manager.get_session() as session:
-            user_repo = UserRepository(session)
-            db_user = await user_repo.get_user_by_discord_id(str(interaction.user.id))
-            if db_user:
-                db_user.model_preset = model_preset
-                await user_repo.update_user(session, db_user)
-                await session.commit()
-                await interaction.response.send_message(f"✅ 使用モデルを **{model_preset.capitalize()}** に変更しました。", ephemeral=True)
-            else:
-                await interaction.response.send_message("ユーザー情報が見つかりません。", ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            
+            db_session = self.db_manager.get_session()
+            try:
+                db_user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
+                if db_user:
+                    db_user.model_preset = model_preset
+                    await db_session.commit()
+                    
+                    embed = discord.Embed(
+                        title="✅ モデル変更完了",
+                        description=f"使用モデルを **{model_preset.capitalize()}** に変更しました。",
+                        color=discord.Color.green()
+                    )
+                    embed.set_footer(text="Made by RovaexTeam")
+                    
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                else:
+                    await interaction.followup.send("ユーザー情報が見つかりません。", ephemeral=True)
+            finally:
+                await db_session.close()
+        except Exception as e:
+            logger.error(f"Error in update_model: {e}", exc_info=True)
+            embed = discord.Embed(
+                title="❌ エラー",
+                description=f"モデル変更中にエラーが発生しました: {str(e)}",
+                color=discord.Color.red()
+            )
+            embed.set_footer(text="Made by RovaexTeam")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 class DeleteConfirmView(discord.ui.View):
+    """View for API key deletion confirmation"""
+    
     def __init__(self, user_id: int, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
-        super().__init__(timeout=60)
+        super().__init__(timeout=300)
         self.user_id = user_id
         self.db_manager = db_manager
         self.encryption_manager = encryption_manager
 
-    @discord.ui.button(label="削除する", style=discord.ButtonStyle.danger)
+    @discord.ui.button(label="削除する", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Confirm API key deletion"""
         if interaction.user.id != self.user_id:
             await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
             return
 
-        async with self.db_manager.get_session() as session:
-            user_repo = UserRepository(session)
-            api_repo = APIKeyRepository(session)
-            db_user = await user_repo.get_user_by_discord_id(str(interaction.user.id))
-            if db_user:
-                await api_repo.delete_key(session, db_user.id)
-                await session.commit()
-                await interaction.response.send_message("✅ 登録済みのAPIキーを削除しました。", ephemeral=True)
-            else:
-                await interaction.response.send_message("ユーザー情報が見つかりません。", ephemeral=True)
+        try:
+            await interaction.response.defer(ephemeral=True)
+            
+            db_session = self.db_manager.get_session()
+            try:
+                db_user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
+                if db_user:
+                    # Delete all API keys for this user
+                    from sqlalchemy import delete
+                    from modules.database.models import APIKey
+                    stmt = delete(APIKey).where(APIKey.user_id == db_user.id)
+                    await db_session.execute(stmt)
+                    await db_session.commit()
+                    
+                    embed = discord.Embed(
+                        title="✅ API Key 削除完了",
+                        description="登録済みのAPIキーを削除しました。",
+                        color=discord.Color.green()
+                    )
+                    embed.set_footer(text="Made by RovaexTeam")
+                    
+                    await interaction.followup.send(embed=embed, ephemeral=True)
+                else:
+                    await interaction.followup.send("ユーザー情報が見つかりません。", ephemeral=True)
+            finally:
+                await db_session.close()
+        except Exception as e:
+            logger.error(f"Error in confirm_button: {e}", exc_info=True)
+            embed = discord.Embed(
+                title="❌ エラー",
+                description=f"API Key 削除中にエラーが発生しました: {str(e)}",
+                color=discord.Color.red()
+            )
+            embed.set_footer(text="Made by RovaexTeam")
+            await interaction.followup.send(embed=embed, ephemeral=True)
 
-    @discord.ui.button(label="キャンセル", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="キャンセル", style=discord.ButtonStyle.secondary, emoji="❌")
     async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_message("削除をキャンセルしました。", ephemeral=True)
+        """Cancel API key deletion"""
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
+            return
+        
+        try:
+            embed = discord.Embed(
+                title="✅ キャンセル",
+                description="削除をキャンセルしました。",
+                color=discord.Color.blue()
+            )
+            embed.set_footer(text="Made by RovaexTeam")
+            
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error in cancel_button: {e}", exc_info=True)
+
 
 class SettingCog(commands.Cog):
+    """Cog for user settings"""
+    
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name="setting", description="ユーザー設定（APIキー・モデル等）を管理します")
-    @has_permission(PermissionLevel.USER)
-    async def setting(self, ctx: commands.Context):
+    @app_commands.command(name="setting", description="ユーザー設定（APIキー・モデル等）を管理します")
+    @PermissionManager.has_permission(PermissionLevel.USER)
+    async def setting(self, interaction: discord.Interaction):
         """Show the setting menu"""
-        async with self.bot.db_manager.get_session() as session:
-            user_repo = UserRepository(session)
+        try:
+            await interaction.response.defer(ephemeral=True)
             
-            # Ensure user exists
-            await user_repo.get_or_create_user(
-                session,
-                str(ctx.author.id),
-                ctx.author.name,
-                ctx.author.discriminator
-            )
-            await session.commit()
-            
+            db_session = self.bot.db_manager.get_session()
+            try:
+                # Ensure user exists
+                await UserRepository.get_or_create_user(
+                    db_session,
+                    str(interaction.user.id),
+                    interaction.user.name,
+                    interaction.user.discriminator
+                )
+                await db_session.commit()
+                
+                embed = discord.Embed(
+                    title="⚙️ CoderAgent ユーザー設定",
+                    description="以下のメニューから設定項目を選択してください。",
+                    color=discord.Color.blue()
+                )
+                embed.set_footer(text="Made by RovaexTeam")
+                
+                view = SettingView(interaction.user.id, self.bot.db_manager, self.bot.encryption_manager)
+                
+                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+            finally:
+                await db_session.close()
+        except Exception as e:
+            logger.error(f"Error in setting command: {e}", exc_info=True)
             embed = discord.Embed(
-                title="⚙️ CoderAgent ユーザー設定",
-                description="以下のメニューから設定項目を選択してください。",
-                color=discord.Color.blue()
+                title="❌ エラー",
+                description=f"設定メニューの表示中にエラーが発生しました: {str(e)}",
+                color=discord.Color.red()
             )
-            
-            view = SettingView(ctx.author.id, self.bot.db_manager, self.bot.encryption_manager)
-            
-            if ctx.interaction:
-                await ctx.interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-            else:
-                await ctx.send(embed=embed, view=view)
+            embed.set_footer(text="Made by RovaexTeam")
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
 
 async def setup(bot: commands.Bot):
+    """Setup the cog"""
     cog = SettingCog(bot)
     await bot.add_cog(cog)
-    bot.tree.add_command(cog.setting)
