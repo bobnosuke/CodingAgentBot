@@ -67,15 +67,9 @@ class APIKeyCog(commands.Cog):
                 )
 
                 encrypted_key = self.bot.encryption_manager.encrypt(api_key)
-                existing_key = await APIKeyRepository.get_active_api_key(db_session, db_user.id)
-
-                if existing_key:
-                    # Update (In this simple repo, we'll just log and update)
-                    logger.info(f"User {user.id} updated their API key")
-                    # Note: APIKeyRepository might need an update method, but for now we re-create
-                    # or the repo logic handles it.
                 
-                await APIKeyRepository.create_api_key(
+                # Set API key (Update if exists, otherwise create)
+                await APIKeyRepository.set_api_key(
                     db_session,
                     db_user.id,
                     encrypted_key,

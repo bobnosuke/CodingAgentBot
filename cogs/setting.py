@@ -178,7 +178,7 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
                 # 暗号化して保存
                 encrypted_key = self.encryption_manager.encrypt(self.api_key_input.value)
                 
-                await APIKeyRepository.create_api_key(
+                await APIKeyRepository.set_api_key(
                     db_session,
                     db_user.id,
                     encrypted_key,

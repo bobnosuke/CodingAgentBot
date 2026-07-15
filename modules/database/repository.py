@@ -131,6 +131,35 @@ class APIKeyRepository:
             await session.rollback()
             raise
 
+    @staticmethod
+    async def set_api_key(
+        session: AsyncSession,
+        user_id: int,
+        encrypted_key: str,
+        key_name: str = "Default"
+    ) -> APIKey:
+        """Set API key for user (Update if exists, otherwise create)"""
+        try:
+            # Check for existing active key
+            existing_key = await APIKeyRepository.get_active_api_key(session, user_id)
+            
+            if existing_key:
+                # Update existing key
+                existing_key.encrypted_key = encrypted_key
+                existing_key.key_name = key_name
+                existing_key.updated_at = datetime.utcnow()
+                await session.commit()
+                logger.info(f"Updated API key for user {user_id}")
+                return existing_key
+            else:
+                # Create new key
+                return await APIKeyRepository.create_api_key(session, user_id, encrypted_key, key_name)
+        
+        except Exception as e:
+            logger.error(f"Error in set_api_key: {e}")
+            await session.rollback()
+            raise
+
 
 class SessionRepository:
     """Repository for Session operations"""
