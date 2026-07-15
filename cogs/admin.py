@@ -4,7 +4,7 @@ from discord import app_commands
 from logger import setup_logger
 from modules.security.permissions import PermissionLevel, PermissionManager
 from modules.database.database import DatabaseManager
-from modules.database.repository import UserRepository, SessionRepository, UsageLogRepository
+from modules.database.repository import UserRepository, SessionRepository, MessageRepository
 
 logger = setup_logger(__name__)
 
@@ -49,13 +49,9 @@ class AdminCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
 
         async with self.bot.db_manager.get_session() as session:
-            user_repo = UserRepository(session)
-            session_repo = SessionRepository(session)
-            usage_repo = UsageLogRepository(session)
-
-            total_users = await user_repo.get_total_users()
-            total_sessions = await session_repo.get_total_sessions()
-            total_ai_calls = await usage_repo.get_total_usage_count()
+            total_users = await UserRepository.count_users(session)
+            total_sessions = await SessionRepository.count_sessions(session)
+            total_ai_calls = await MessageRepository.count_messages(session)
 
             embed = discord.Embed(
                 title="📊 Bot Usage Statistics",

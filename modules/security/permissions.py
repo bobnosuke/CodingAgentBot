@@ -46,7 +46,42 @@ class PermissionManager:
         return PermissionLevel.USER
     
     @staticmethod
-    def has_permission(
+    def has_permission(required_level: PermissionLevel):
+        """
+        Decorator for app commands requiring specific permission level
+        
+        Args:
+            required_level: Required permission level
+        """
+        async def predicate(interaction: discord.Interaction) -> bool:
+            user_level = PermissionManager.get_permission_level(interaction.user, interaction.guild)
+            has_perm = user_level.value >= required_level.value
+            
+            if not has_perm:
+                logger.warning(
+                    f"Permission denied for {interaction.user} ({interaction.user.id}) "
+                    f"in {interaction.guild}: required {required_level.name}"
+                )
+                if interaction.response.is_done():
+                    await interaction.followup.send(
+                        f"❌ You don't have permission to use this command. "
+                        f"Required level: {required_level.name}",
+                        ephemeral=True
+                    )
+                else:
+                    await interaction.response.send_message(
+                        f"❌ You don't have permission to use this command. "
+                        f"Required level: {required_level.name}",
+                        ephemeral=True
+                    )
+                return False
+            
+            return True
+        
+        return discord.app_commands.check(predicate)
+
+    @staticmethod
+    def check_permission(
         user: discord.User,
         required_level: PermissionLevel,
         guild: discord.Guild = None
@@ -74,7 +109,7 @@ def require_permission(required_level: PermissionLevel):
         required_level: Required permission level
     """
     async def predicate(ctx: commands.Context) -> bool:
-        has_perm = PermissionManager.has_permission(
+        has_perm = PermissionManager.check_permission(
             ctx.author,
             required_level,
             ctx.guild
