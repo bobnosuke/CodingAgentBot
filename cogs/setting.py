@@ -18,11 +18,11 @@ logger = setup_logger(__name__)
 
 
 class SettingView(discord.ui.View):
-    """View for /setting command with select menu (Public Panel)"""
+    """Persistent View for /setting command (Public Panel)"""
     
-    def __init__(self, user_id: int, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
-        super().__init__(timeout=300)
-        self.user_id = user_id
+    def __init__(self, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
+        # 永続化のためにtimeout=Noneを設定
+        super().__init__(timeout=None)
         self.db_manager = db_manager
         self.encryption_manager = encryption_manager
 
@@ -33,18 +33,16 @@ class SettingView(discord.ui.View):
             discord.SelectOption(label="使用モデル変更", value="model", description="AIモデル設定を変更します", emoji="🤖"),
             discord.SelectOption(label="利用状況確認", value="status", description="本日の利用回数や使用モデルを確認します", emoji="📊"),
             discord.SelectOption(label="API Key削除", value="delete_key", description="登録済みAPIキーを削除します", emoji="🗑️"),
-        ]
+        ],
+        custom_id="persistent:setting_select"  # custom_idを固定
     )
     async def select_callback(self, interaction: discord.Interaction, select: discord.ui.Select):
         """Handle setting selection from Public Panel"""
-        if interaction.user.id != self.user_id:
-            await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
-            return
-
+        # 永続Viewではインスタンス変数にuser_idを持たせられないため、interaction.userを使用
+        user_id = interaction.user.id
         value = select.values[0]
         
         try:
-            # 公開パネルからの操作なので、すべて「新規ephemeralメッセージ」として送信する
             if value == "api_key":
                 await interaction.response.send_modal(APIKeyModal(self.db_manager, self.encryption_manager))
             elif value == "model":
@@ -59,7 +57,7 @@ class SettingView(discord.ui.View):
 
     async def show_model_selection(self, interaction: discord.Interaction):
         """Show model selection menu (New Ephemeral)"""
-        view = ModelSelectionView(self.user_id, self.db_manager)
+        view = ModelSelectionView(interaction.user.id, self.db_manager)
         embed = discord.Embed(
             title="🤖 使用モデル変更",
             description="利用するAIモデルのプリセットを選択してください。",
@@ -70,7 +68,6 @@ class SettingView(discord.ui.View):
         embed.add_field(name="💰 節約", value="簡単な質問、軽量コード生成に最適", inline=False)
         embed.set_footer(text="Made by RovaexTeam")
         
-        # 公開パネルは編集せず、新規ephemeralを送信
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
     async def show_status(self, interaction: discord.Interaction):
@@ -98,14 +95,13 @@ class SettingView(discord.ui.View):
             embed.add_field(name="残り利用回数", value=str(remaining), inline=True)
             embed.set_footer(text="Made by RovaexTeam")
             
-            # 公開パネルは編集せず、新規ephemeralを送信
             await interaction.followup.send(embed=embed, ephemeral=True)
         finally:
             await db_session.close()
 
     async def confirm_delete_key(self, interaction: discord.Interaction):
         """Confirm API key deletion (New Ephemeral)"""
-        view = DeleteConfirmView(self.user_id, self.db_manager, self.encryption_manager)
+        view = DeleteConfirmView(interaction.user.id, self.db_manager, self.encryption_manager)
         embed = discord.Embed(
             title="⚠️ API Key 削除確認",
             description="登録済みのAPIキーを削除しますか？削除後はコーディング機能が利用できなくなります。",
@@ -113,7 +109,6 @@ class SettingView(discord.ui.View):
         )
         embed.set_footer(text="Made by RovaexTeam")
         
-        # 公開パネルは編集せず、新規ephemeralを送信
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
@@ -166,7 +161,7 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
 
 
 class ModelSelectionView(discord.ui.View):
-    """View for model selection (Ephemeral Panel)"""
+    """View for model selection (Ephemeral Panel - No need to persist)"""
     
     def __init__(self, user_id: int, db_manager: DatabaseManager):
         super().__init__(timeout=300)
@@ -192,7 +187,6 @@ class ModelSelectionView(discord.ui.View):
             return
 
         try:
-            # ephemeralメッセージ内での操作なので、編集（edit）を行う
             await interaction.response.defer(ephemeral=True)
             
             db_session = self.db_manager.get_session()
@@ -209,7 +203,6 @@ class ModelSelectionView(discord.ui.View):
                     )
                     embed.set_footer(text="Made by RovaexTeam")
                     
-                    # 自身のephemeralメッセージを編集
                     await interaction.edit_original_response(embed=embed, view=None)
                 else:
                     await interaction.followup.send("ユーザー情報が見つかりません。", ephemeral=True)
@@ -221,7 +214,7 @@ class ModelSelectionView(discord.ui.View):
 
 
 class DeleteConfirmView(discord.ui.View):
-    """View for API key deletion confirmation (Ephemeral Panel)"""
+    """View for API key deletion confirmation (Ephemeral Panel - No need to persist)"""
     
     def __init__(self, user_id: int, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
         super().__init__(timeout=300)
@@ -256,7 +249,6 @@ class DeleteConfirmView(discord.ui.View):
                     )
                     embed.set_footer(text="Made by RovaexTeam")
                     
-                    # 自身のephemeralメッセージを編集
                     await interaction.edit_original_response(embed=embed, view=None)
                 else:
                     await interaction.followup.send("ユーザー情報が見つかりません。", ephemeral=True)
@@ -280,7 +272,6 @@ class DeleteConfirmView(discord.ui.View):
         )
         embed.set_footer(text="Made by RovaexTeam")
         
-        # 自身のephemeralメッセージを編集
         await interaction.response.edit_message(embed=embed, view=None)
 
 
@@ -305,7 +296,8 @@ class SettingCog(commands.Cog):
                 )
                 embed.set_footer(text="Made by RovaexTeam")
                 
-                view = SettingView(user.id, self.bot.db_manager, self.bot.encryption_manager)
+                # 永続Viewを使用
+                view = SettingView(self.bot.db_manager, self.bot.encryption_manager)
                 
                 if isinstance(target, discord.Interaction):
                     if target.response.is_done():

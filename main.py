@@ -67,6 +67,14 @@ class CoderAgent(commands.Bot):
         # Load cogs
         await self.load_cogs()
 
+        # Register persistent views
+        from cogs.setting import SettingView
+        from cogs.coding import CodingPanelView
+        
+        self.add_view(SettingView(self.db_manager, self.encryption_manager))
+        self.add_view(CodingPanelView(self))
+        logger.info("✅ Persistent views registered")
+
         # Setup global app command error handler
         from modules.security.errors import ErrorHandler
         self.tree.on_error = ErrorHandler.handle_error
@@ -102,7 +110,7 @@ class CoderAgent(commands.Bot):
         # Sync commands to Discord
         await self.tree.sync()
         logger.info("✅ Commands synced to Discord")
-
+	
     async def reload_cogs(self) -> None:
         """Reload all cogs"""
         cogs_dir = Path(__file__).parent / "cogs"
@@ -115,15 +123,10 @@ class CoderAgent(commands.Bot):
                     logger.info(f"🔄 Reloaded cog: {cog_name}")
                 except Exception as e:
                     logger.error(f"❌ Failed to reload cog {cog_name}: {e}")
-
+	
     @commands.command(name="reload", description="Reload all cogs (Owner only)")
     async def reload_command(self, ctx: commands.Context):
-        """
-        Reload all cogs
-        
-        Args:
-            ctx: Command context
-        """
+        """Reload all cogs"""
         if ctx.author.id != self.owner_id:
             await ctx.send("❌ You are not the owner of this bot.", ephemeral=True)
             return

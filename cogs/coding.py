@@ -15,12 +15,12 @@ logger = setup_logger(__name__)
 
 
 class CodingPanelView(discord.ui.View):
-    """View for /coding panel (Public Panel)"""
+    """Persistent View for /coding panel (Public Panel)"""
     
-    def __init__(self, bot: commands.Bot, user_id: int):
-        super().__init__(timeout=300)
+    def __init__(self, bot: commands.Bot):
+        # 永続化のためにtimeout=Noneを設定
+        super().__init__(timeout=None)
         self.bot = bot
-        self.user_id = user_id
         self.session_manager = SessionManager(bot)
     
     @discord.ui.select(
@@ -30,11 +30,11 @@ class CodingPanelView(discord.ui.View):
             discord.SelectOption(label="プロジェクト一覧", value="list", emoji="📋", description="あなたのプロジェクト一覧を表示します"),
             discord.SelectOption(label="プロジェクト詳細", value="info", emoji="ℹ️", description="プロジェクトの詳細情報を確認します"),
             discord.SelectOption(label="プロジェクト名変更", value="rename", emoji="✏️", description="プロジェクト名を変更します"),
-        ]
+        ],
+        custom_id="persistent:coding_panel_select"  # custom_idを固定
     )
     async def panel_select(self, interaction: discord.Interaction, select: discord.ui.Select):
         """Handle selection from Public Panel"""
-        # 公開パネルからの操作なので、新規ephemeralメッセージとして応答する
         await interaction.response.defer(ephemeral=True)
         
         action = select.values[0]
@@ -89,10 +89,8 @@ class CodingPanelView(discord.ui.View):
             embed.add_field(name="Channel", value=coding_room.mention, inline=False)
             embed.set_footer(text="Made by RovaexTeam")
             
-            # 公開パネルは編集せず、新規ephemeralを送信
             await interaction.followup.send(embed=embed, ephemeral=True)
             
-            # Coding Room welcome
             welcome_embed = discord.Embed(
                 title="🤖 Welcome to your Coding Session",
                 description="I'm your AI coding assistant. Tell me what you'd like to build!",
@@ -136,7 +134,8 @@ class CodingCog(commands.Cog):
             color=discord.Color.blue()
         )
         embed.set_footer(text="Made by RovaexTeam")
-        view = CodingPanelView(self.bot, interaction.user.id)
+        # 永続Viewを使用
+        view = CodingPanelView(self.bot)
         await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
     
     @coding_group.command(name="start", description="新しいコーディングセッションを開始します")
@@ -205,7 +204,6 @@ class CodingCog(commands.Cog):
                     return
                 
                 await self.session_manager.end_session(self.session_uuid)
-                # 自身のephemeral確認メッセージを編集
                 await interaction.response.edit_message(content="✅ セッションを終了しました。", embed=None, view=None)
             
             @discord.ui.button(label="いいえ", style=discord.ButtonStyle.secondary, emoji="❌")
@@ -214,11 +212,9 @@ class CodingCog(commands.Cog):
                     await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
                     return
                 
-                # 自身のephemeral確認メッセージを編集
                 await interaction.response.edit_message(content="セッションの終了をキャンセルしました。", embed=None, view=None)
         
         view = ConfirmView(self.session_manager, session_uuid, user_id)
-        # 最初の確認メッセージは新規ephemeralとして送信
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
