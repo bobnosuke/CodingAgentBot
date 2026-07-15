@@ -10,6 +10,7 @@ from datetime import datetime
 from logger import setup_logger
 from modules.security.permissions import PermissionLevel, PermissionManager
 from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository
+from modules.security.limits import UsageLimitManager
 from modules.session.manager import SessionManager
 from modules.ai.openrouter import OpenRouterClient, AIService
 from modules.file.manager import FileManager
@@ -172,6 +173,21 @@ class CodingCog(commands.Cog):
 
         try:
             user_id = str(user.id)
+
+            # --- Limit Check ---
+            db_session = self.bot.db_manager.get_session()
+            try:
+                is_allowed, limit_msg = await UsageLimitManager.check_limits(db_session, user_id)
+                if not is_allowed:
+                    if is_interaction:
+                        await ctx_or_inter.response.send_message(limit_msg, ephemeral=True)
+                    else:
+                        await ctx_or_inter.send(limit_msg)
+                    return
+            finally:
+                await db_session.close()
+            # -------------------
+
             active_session = self.session_manager.get_user_active_session(user_id)
 
             if active_session:
@@ -277,6 +293,21 @@ class CodingCog(commands.Cog):
 
         try:
             user_id = str(user.id)
+
+            # --- Limit Check ---
+            db_session = self.bot.db_manager.get_session()
+            try:
+                is_allowed, limit_msg = await UsageLimitManager.check_limits(db_session, user_id)
+                if not is_allowed:
+                    if is_interaction:
+                        await ctx_or_inter.response.send_message(limit_msg, ephemeral=True)
+                    else:
+                        await ctx_or_inter.send(limit_msg)
+                    return
+            finally:
+                await db_session.close()
+            # -------------------
+
             session_uuid = self.session_manager.get_user_active_session(user_id)
 
             if not session_uuid:
@@ -321,6 +352,25 @@ class CodingCog(commands.Cog):
                             pass
 
                 if full_response:
+                    # Log usage in database
+                    db_session = self.bot.db_manager.get_session()
+                    try:
+                        from modules.database.repository import UsageLogRepository, UserRepository
+                        db_user = await UserRepository.get_user_by_discord_id(db_session, user_id)
+                        if db_user:
+                            # Token count estimation (rough)
+                            t_in = len(message) // 4
+                            t_out = len(full_response) // 4
+                            await UsageLogRepository.log_usage(
+                                db_session, 
+                                db_user.id, 
+                                ai_service.model if hasattr(ai_service, 'model') else "unknown",
+                                token_input=t_in,
+                                token_output=t_out
+                            )
+                    finally:
+                        await db_session.close()
+
                     if len(full_response) > 2000:
                         chunks = [full_response[i:i+2000] for i in range(0, len(full_response), 2000)]
                         await thinking_msg.edit(content=chunks[0])

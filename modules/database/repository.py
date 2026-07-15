@@ -183,6 +183,53 @@ class SessionRepository:
             raise
 
 
+class UsageLogRepository:
+    """Repository for UsageLog operations"""
+
+    @staticmethod
+    async def log_usage(
+        session: AsyncSession,
+        user_id: int,
+        model: str,
+        token_input: int = 0,
+        token_output: int = 0,
+        estimated_cost: float = 0.0
+    ) -> UsageLog:
+        """Log API usage"""
+        try:
+            usage = UsageLog(
+                user_id=user_id,
+                model=model,
+                token_input=token_input,
+                token_output=token_output,
+                estimated_cost=estimated_cost
+            )
+            session.add(usage)
+            await session.commit()
+            return usage
+        except Exception as e:
+            logger.error(f"Error in log_usage: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_daily_usage_count(session: AsyncSession, user_id: int) -> int:
+        """Get message count for today"""
+        try:
+            from datetime import datetime, time as dt_time
+            today_start = datetime.combine(datetime.utcnow().date(), dt_time.min)
+            
+            stmt = select(UsageLog).where(
+                (UsageLog.user_id == user_id) & 
+                (UsageLog.created_at >= today_start)
+            )
+            result = await session.execute(stmt)
+            return len(result.scalars().all())
+        except Exception as e:
+            logger.error(f"Error in get_daily_usage_count: {e}")
+            raise
+
+
 class MessageRepository:
     """Repository for Message operations"""
     
