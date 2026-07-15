@@ -12,7 +12,9 @@
 - [x] **タスクID 18**: CodingRoom 内コマンド (!list, !get, !download, !close, !readme) の実装
 - [x] **タスクID 19**: `/coding server` コマンドの実装
 - [x] **タスクID 20**: オーナー専用 /reload コマンドの実装
-- [ ] **タスクID 21**: メッセージとログの日本語化
+- [x] **タスクID 21**: メッセージとログの日本語化（cogs/coding.py 等の主要部分）
+- [x] **タスクID 22**: 自律エージェント・パイプラインの実装（Gemini + OpenRouter）
+- [x] **タスクID 23**: 要件定義フェーズ用のインタラクティブ UI 実装
 
 ### Manus-Beta (担当: Manus-Beta)
 - [ ] **タスクID 9**: `/coding` サブコマンドの拡充（panel, list, info, export, rename, delete）
