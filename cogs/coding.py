@@ -135,7 +135,10 @@ class CodingCog(commands.Cog):
         self.bot = bot
         self.session_manager = SessionManager(bot)
     
-    coding_group = app_commands.Group(name="coding", description="AI Coding related commands")
+    coding_group = app_commands.Group(
+        name=app_commands.locale_str("COMMAND.CODING.NAME"), 
+        description=app_commands.locale_str("COMMAND.CODING.DESC")
+    )
     
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
@@ -223,7 +226,10 @@ class CodingCog(commands.Cog):
             finally:
                 await db_session.close()
 
-    @coding_group.command(name="panel", description="Show coding management panel")
+    @coding_group.command(
+        name=app_commands.locale_str("COMMAND.CODING.PANEL_NAME"), 
+        description=app_commands.locale_str("COMMAND.CODING.PANEL_DESC")
+    )
     async def coding_panel(self, interaction: discord.Interaction):
         """Show Public Panel"""
         db_session = self.bot.db_manager.get_session()
@@ -254,7 +260,10 @@ class CodingCog(commands.Cog):
         finally:
             await db_session.close()
     
-    @coding_group.command(name="start", description="Start a new coding session")
+    @coding_group.command(
+        name=app_commands.locale_str("COMMAND.CODING.START_NAME"), 
+        description=app_commands.locale_str("COMMAND.CODING.START_DESC")
+    )
     async def coding_start(self, interaction: discord.Interaction, project_name: str = None):
         """Start Session (New Ephemeral)"""
         await interaction.response.defer(ephemeral=True)
@@ -299,62 +308,65 @@ class CodingCog(commands.Cog):
         finally:
             await db_session.close()
 
-    @coding_group.command(name="end", description="End current coding session")
+    @coding_group.command(
+        name=app_commands.locale_str("COMMAND.CODING.END_NAME"), 
+        description=app_commands.locale_str("COMMAND.CODING.END_DESC")
+    )
     async def coding_end(self, interaction: discord.Interaction):
         """End Session (New Ephemeral Confirmation)"""
         db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
             lang = user.language or "en-US"
-            session_uuid = self.session_manager.get_user_active_session(str(interaction.user.id))
             
-            if not session_uuid:
+            active_session_uuid = self.session_manager.get_user_active_session(str(interaction.user.id))
+            if not active_session_uuid:
+                # Check if we are in a coding room
+                channel_id = str(interaction.channel.id)
+                for uuid, info in self.session_manager.active_sessions.items():
+                    if info["channel_id"] == channel_id:
+                        active_session_uuid = uuid
+                        break
+            
+            if not active_session_uuid:
                 await interaction.response.send_message("❌ No active session found.", ephemeral=True)
                 return
-            
+
             embed = discord.Embed(
                 title=i18n.translate(lang, "CODING.END_CONFIRM_TITLE"),
                 description=i18n.translate(lang, "CODING.END_CONFIRM_DESC"),
-                color=discord.Color.red()
+                color=discord.Color.orange()
             )
-            embed.set_footer(text="Made by RovaexTeam")
-            
-            class ConfirmView(discord.ui.View):
-                def __init__(self, session_manager, session_uuid, user_id, lang):
-                    super().__init__(timeout=60)
-                    self.session_manager = session_manager
-                    self.session_uuid = session_uuid
-                    self.user_id = user_id
-                    self.lang = lang
-                
-                @discord.ui.button(label=i18n.translate(lang, "COMMON.YES"), style=discord.ButtonStyle.danger, emoji="✅")
-                async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-                    if str(interaction.user.id) != self.user_id:
-                        await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
-                        return
-                    
-                    db_session = self.session_manager.bot.db_manager.get_session()
-                    try:
-                        await self.session_manager.close_session(db_session, self.session_uuid)
-                        await db_session.commit()
-                    finally:
-                        await db_session.close()
-                    
-                    await interaction.response.edit_message(content=i18n.translate(self.lang, "CODING.END_SUCCESS"), embed=None, view=None)
-                
-                @discord.ui.button(label=i18n.translate(lang, "COMMON.NO"), style=discord.ButtonStyle.secondary, emoji="❌")
-                async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-                    if str(interaction.user.id) != self.user_id:
-                        await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
-                        return
-                    await interaction.response.edit_message(content=i18n.translate(self.lang, "CODING.END_CANCEL"), embed=None, view=None)
-            
-            view = ConfirmView(self.session_manager, session_uuid, str(interaction.user.id), lang)
+            view = SessionEndConfirmView(self.bot, lang, active_session_uuid)
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         finally:
             await db_session.close()
 
 
+class SessionEndConfirmView(discord.ui.View):
+    def __init__(self, bot, lang, session_uuid):
+        super().__init__(timeout=60)
+        self.bot = bot
+        self.lang = lang
+        self.session_uuid = session_uuid
+        self.session_manager = SessionManager(bot)
+
+    @discord.ui.button(label="End Session", style=discord.ButtonStyle.danger)
+    async def confirm(self, interaction: discord.Interaction, button: discord.ui.Button):
+        db_session = self.bot.db_manager.get_session()
+        try:
+            await self.session_manager.close_session(db_session, self.session_uuid)
+            await interaction.response.edit_message(content=i18n.translate(self.lang, "CODING.END_SUCCESS"), embed=None, view=None)
+        except Exception as e:
+            logger.error(f"Error closing session: {e}")
+            await interaction.response.edit_message(content=f"❌ Error: {e}", embed=None, view=None)
+        finally:
+            await db_session.close()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.edit_message(content=i18n.translate(self.lang, "CODING.END_CANCEL"), embed=None, view=None)
+
+
 async def setup(bot: commands.Bot):
-    """Setup the cog"""
     await bot.add_cog(CodingCog(bot))

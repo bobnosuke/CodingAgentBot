@@ -10,6 +10,22 @@
         "LOADING": "Processing...",
         "PERMISSION_DENIED": "❌ You don't have permission to use this command."
     },
+    "COMMAND": {
+        "SETTING": {
+            "NAME": "setting",
+            "DESC": "Configure bot settings (AI model, API key, language)"
+        },
+        "CODING": {
+            "NAME": "coding",
+            "DESC": "AI Coding related commands",
+            "PANEL_NAME": "panel",
+            "PANEL_DESC": "Show coding management panel",
+            "START_NAME": "start",
+            "START_DESC": "Start a new coding session",
+            "END_NAME": "end",
+            "END_DESC": "End current coding session"
+        }
+    },
     "SETTING": {
         "PANEL_TITLE": "⚙️ CoderAgent User Settings",
         "PANEL_DESC": "Configure your AI model, API key, and language settings.\nClick the button below to start configuration (Ephemeral).",

@@ -255,7 +255,10 @@ class SettingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
     
-    @app_commands.command(name="setting", description="Configure bot settings (AI model, API key, language)")
+    @app_commands.command(
+        name=app_commands.locale_str("COMMAND.SETTING.NAME"), 
+        description=app_commands.locale_str("COMMAND.SETTING.DESC")
+    )
     async def setting(self, interaction: discord.Interaction):
         """Show User Settings Panel (Public Start Button)"""
         db_session = self.bot.db_manager.get_session()

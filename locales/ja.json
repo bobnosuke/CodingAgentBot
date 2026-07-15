@@ -10,6 +10,22 @@
         "LOADING": "処理中...",
         "PERMISSION_DENIED": "❌ このコマンドを使用する権限がありません。"
     },
+    "COMMAND": {
+        "SETTING": {
+            "NAME": "setting",
+            "DESC": "Botの設定（AIモデル、APIキー、言語）を構成します"
+        },
+        "CODING": {
+            "NAME": "coding",
+            "DESC": "AIコーディング関連のコマンド",
+            "PANEL_NAME": "panel",
+            "PANEL_DESC": "コーディング管理パネルを表示します",
+            "START_NAME": "start",
+            "START_DESC": "新しいコーディングセッションを開始します",
+            "END_NAME": "end",
+            "END_DESC": "現在のコーディングセッションを終了します"
+        }
+    },
     "SETTING": {
         "PANEL_TITLE": "⚙️ CoderAgent ユーザー設定",
         "PANEL_DESC": "AIモデル、APIキー、言語設定を構成します。\n下のボタンを押して設定を開始してください（非公開メッセージ）。",
@@ -31,7 +47,7 @@
         "MODEL_BALANCE": "バランス",
         "MODEL_LOW": "節約",
         "MODEL_SET_SUCCESS": "✅ AIモデルを **{model}** に設定しました。",
-        "API_KEY_PROMPT": "モーダルにOpenRouterのAPIキーを入力してください。",
+        "API_KEY_PROMPT": "モーダルにOpenRouter APIキーを入力してください。",
         "API_KEY_SET_SUCCESS": "✅ APIキーを登録しました。",
         "API_KEY_DELETE_CONFIRM": "⚠️ 本当にAPIキーを削除しますか？",
         "API_KEY_DELETE_SUCCESS": "✅ APIキーを削除しました。",
