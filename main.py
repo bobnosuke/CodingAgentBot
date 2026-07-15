@@ -8,6 +8,7 @@ from logger import setup_logger
 from modules.database.database import DatabaseManager
 from modules.security.encryption import EncryptionManager
 from modules.utils.i18n import i18n, CommandTranslator
+from config import Config
 
 # Load environment variables
 load_dotenv()
@@ -79,6 +80,10 @@ class CoderAgent(commands.Bot):
                 await interaction.response.send_message("An error occurred while processing the command.", ephemeral=True)
 
 async def main():
+    # Validate configuration
+    if not Config.validate():
+        logger.error("設定の検証に失敗しました")
+        return
     bot = CoderAgent()
     
     # Setup global error handler for tree
