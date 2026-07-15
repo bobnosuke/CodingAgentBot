@@ -468,6 +468,55 @@ class CodingCog(commands.Cog):
 
         await self.bot.process_commands(message)
 
+    @coding_group.command(name="server", description="View server statistics (Admin only)")
+    @PermissionManager.has_permission(PermissionLevel.ADMIN)
+    async def coding_server(self, interaction: discord.Interaction):
+        """
+        View server statistics
+        
+        Args:
+            interaction: Discord interaction
+        """
+        try:
+            # Defer response
+            await interaction.response.defer(ephemeral=True)
+            
+            # Get database session
+            db_session = self.bot.db_manager.get_session()
+            
+            try:
+                # Get statistics
+                total_users = await UserRepository.count_users(db_session)
+                total_sessions = await SessionRepository.count_sessions(db_session)
+                active_sessions = await SessionRepository.count_active_sessions(db_session)
+                total_messages = await MessageRepository.count_messages(db_session)
+                
+                # Create embed
+                embed = discord.Embed(
+                    title="📊 Server Statistics",
+                    description="CoderAgent の統計情報です",
+                    color=discord.Color.blue()
+                )
+                embed.add_field(name="👥 Total Users", value=str(total_users), inline=True)
+                embed.add_field(name="📝 Total Sessions", value=str(total_sessions), inline=True)
+                embed.add_field(name="🟢 Active Sessions", value=str(active_sessions), inline=True)
+                embed.add_field(name="💬 Total Messages", value=str(total_messages), inline=False)
+                embed.set_footer(text="Made by RovaexTeam")
+                
+                await interaction.followup.send(embed=embed, ephemeral=True)
+                
+                logger.info(f"Admin {interaction.user.name} viewed server statistics")
+            
+            finally:
+                await db_session.close()
+        
+        except Exception as e:
+            logger.error(f"Error in coding_server: {e}", exc_info=True)
+            await interaction.followup.send(
+                f"❌ Error: {str(e)}",
+                ephemeral=True
+            )
+    
     @coding_group.command(name="end", description="End your current coding session")
     async def coding_end(self, interaction: discord.Interaction):
         """

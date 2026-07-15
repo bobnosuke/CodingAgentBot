@@ -58,6 +58,18 @@ class UserRepository:
         except Exception as e:
             logger.error(f"Error in get_user_by_discord_id: {e}")
             raise
+    
+    @staticmethod
+    async def count_users(session: AsyncSession) -> int:
+        """Count total users"""
+        try:
+            from sqlalchemy import func
+            stmt = select(func.count(User.id))
+            result = await session.execute(stmt)
+            return result.scalar() or 0
+        except Exception as e:
+            logger.error(f"Error in count_users: {e}")
+            raise
 
 
 class APIKeyRepository:
@@ -181,6 +193,30 @@ class SessionRepository:
             logger.error(f"Error in close_session: {e}")
             await session.rollback()
             raise
+    
+    @staticmethod
+    async def count_sessions(session: AsyncSession) -> int:
+        """Count total sessions"""
+        try:
+            from sqlalchemy import func
+            stmt = select(func.count(Session.id))
+            result = await session.execute(stmt)
+            return result.scalar() or 0
+        except Exception as e:
+            logger.error(f"Error in count_sessions: {e}")
+            raise
+    
+    @staticmethod
+    async def count_active_sessions(session: AsyncSession) -> int:
+        """Count active sessions"""
+        try:
+            from sqlalchemy import func
+            stmt = select(func.count(Session.id)).where(Session.is_active == True)
+            result = await session.execute(stmt)
+            return result.scalar() or 0
+        except Exception as e:
+            logger.error(f"Error in count_active_sessions: {e}")
+            raise
 
 
 class MessageRepository:
@@ -212,6 +248,18 @@ class MessageRepository:
         except Exception as e:
             logger.error(f"Error in add_message: {e}")
             await session.rollback()
+            raise
+    
+    @staticmethod
+    async def count_messages(session: AsyncSession) -> int:
+        """Count total messages"""
+        try:
+            from sqlalchemy import func
+            stmt = select(func.count(Message.id))
+            result = await session.execute(stmt)
+            return result.scalar() or 0
+        except Exception as e:
+            logger.error(f"Error in count_messages: {e}")
             raise
     
     @staticmethod
