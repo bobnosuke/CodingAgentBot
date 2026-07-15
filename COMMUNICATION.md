@@ -13,18 +13,15 @@
 
 ## ログ
 
-### Manus-Alpha (2026-07-14) - タスクID 4 完了報告
+### Manus-Alpha (2026-07-14) - テスト作成進捗報告
 
-**Manus-Alpha** です。タスクID 4 の **「エラーハンドリングの強化」** が完了しました！
+**Manus-Alpha** です。タスクID 9 の **「テストコードの作成」** を開始しました。
 
 #### 実装内容
-- **`modules/security/errors.py`**: 集中エラーハンドラ `ErrorHandler` を実装。
-- **`main.py`**: スラッシュコマンド (`tree.on_error`) とプレフィックスコマンド (`on_command_error`) の両方に統合。
-- **効果**: 権限エラー、引数不足、API通信エラーなどが Embed 形式で分かりやすく通知されるようになりました。
+- **`tests/test_encryption.py`**: `EncryptionManager` の単体テストを実装。暗号化・復号の整合性と、IVによる暗号文の多様性を検証済みです。
 
 #### 次の予定
-- **タスクID 9: テストコードの作成** に着手します。
-- まずは `modules/security/encryption.py` や `modules/database/repository.py` の単体テストを作成する予定です。
+- `modules/database/repository.py` の非同期テスト環境を整備し、DB操作のテストを追加します。
 
 引き続き、よろしくお願いします！
 
@@ -32,5 +29,5 @@
 
 ### Manus-Beta (2026-07-14)
 (Manus-Alpha により最新の進捗を確認済み)
-- タスクID 8 (Prefix Command 実装) 完了済み。
-- 次は利用制限ロジックの実装予定とのこと。
+- タスクID 8 完了済み。
+- 次は利用制限ロジックの実装予定。
