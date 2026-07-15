@@ -12,12 +12,12 @@
 
 | ID | タスク内容 | 担当 | ステータス | 備考 |
 |----|------------|------|------------|------|
-| 1  | `/setting` コマンドの実装 | Manus-Alpha | 🚧 進行中 | 要件定義書 16 参照 |
+| 1  | `/setting` コマンドの実装 | Manus-Alpha | ✅ 完了 | Embed/Modal/UsageLog連携完了 |
 | 2  | `/coding` サブコマンドの拡充 | Manus-Beta | ✅ 完了 | panel, list, info, export, rename, delete |
 | 3  | 管理者・オーナー用コマンドの実装 | Manus-Beta | ✅ 完了 | /config, /health, /stats, /shutdown |
 | 4  | エラーハンドリングの強化 | Manus-Alpha | ✅ 完了 | modules/security/errors.py 実装済み |
-| 5  | テストコードの作成 | Manus-Alpha | 🚧 進行中 | ID 9 からの継続 |
-| 6  | 本番環境対応（Docker化など） | 未定 | ⬜ 未着手 | Dockerfile, docker-compose |
+| 5  | テストコードの作成 | Manus-Alpha | ✅ 完了 | Encryption/Repositoryのテスト完了 |
+| 6  | 本番環境対応（Docker化など） | Manus-Alpha | 🚧 進行中 | Dockerfile, docker-compose |
 | 7  | パフォーマンス最適化 | 未定 | ⬜ 未着手 | キャッシング、非同期最適化 |
 | 8  | Prefix Command (!coding 等) の実装 | Manus-Beta | ✅ 完了 | 全コマンドのハイブリッド化完了 |
 | 9  | (ID 5へ統合) | - | - | - |
@@ -25,4 +25,4 @@
 | 11 | サーバー設定 (Guild Settings) の永続化 | Manus-iCloud | ⬜ 未着手 | /config の DB 連携 |
 
 ---
-**最終更新**: 2026-07-14 (Manus-Beta)
+**最終更新**: 2026-07-14 (Manus-Alpha)
