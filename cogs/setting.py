@@ -4,20 +4,20 @@ from discord.ext import commands
 import logging
 from typing import Optional
 
-from modules.database.repository import UserRepository, APIKeyRepository
-from modules.database.database import get_db_session
-from modules.security.encryption import EncryptionManager
+from modules.database.repository import UserRepository, APIKeyRepository, UsageLogRepository
 from modules.security.permissions import PermissionLevel, has_permission
+from modules.database.database import DatabaseManager
+from modules.security.encryption import EncryptionManager
 
 logger = logging.getLogger("CoderAgent")
 
 class SettingView(discord.ui.View):
     """View for /setting command with select menu"""
-    def __init__(self, user_id: int, user_repo: UserRepository, api_repo: APIKeyRepository):
+    def __init__(self, user_id: int, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
         super().__init__(timeout=60)
         self.user_id = user_id
-        self.user_repo = user_repo
-        self.api_repo = api_repo
+        self.db_manager = db_manager
+        self.encryption_manager = encryption_manager
 
     @discord.ui.select(
         placeholder="設定項目を選択してください",
@@ -101,9 +101,10 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
         style=discord.TextStyle.short
     )
 
-    def __init__(self, api_repo: APIKeyRepository):
+    def __init__(self, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
         super().__init__()
-        self.api_repo = api_repo
+        self.db_manager = db_manager
+        self.encryption_manager = encryption_manager
 
     async def on_submit(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
@@ -116,20 +117,21 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
                 except:
                     pass
 
-            async with get_db_session() as session:
+            async with self.db_manager.get_session() as session:
                 user_repo = UserRepository(session)
                 api_repo = APIKeyRepository(session)
                 
-                db_user = await user_repo.get_or_create(
+                db_user = await user_repo.get_or_create_user(
+                    session,
                     str(interaction.user.id),
-                    interaction.user.name
+                    interaction.user.name,
+                    interaction.user.discriminator
                 )
                 
                 # 暗号化して保存
-                encryption = EncryptionManager()
-                encrypted_key = encryption.encrypt(self.api_key.value)
+                encrypted_key = self.encryption_manager.encrypt(self.api_key_input.value)
                 
-                await api_repo.set_key(db_user.id, encrypted_key)
+                await api_repo.set_key(session, db_user.id, encrypted_key)
                 await session.commit()
 
             await interaction.followup.send("✅ APIキーを暗号化して保存しました。これよりコーディング機能が利用可能です。", ephemeral=True)
@@ -138,10 +140,10 @@ class APIKeyModal(discord.ui.Modal, title="OpenRouter API Key 設定"):
             await interaction.followup.send("❌ APIキーの保存中にエラーが発生しました。", ephemeral=True)
 
 class ModelSelectionView(discord.ui.View):
-    def __init__(self, user_id: int, user_repo: UserRepository):
+    def __init__(self, user_id: int, db_manager: DatabaseManager):
         super().__init__(timeout=60)
         self.user_id = user_id
-        self.user_repo = user_repo
+        self.db_manager = db_manager
 
     @discord.ui.button(label="高品質", style=discord.ButtonStyle.primary, emoji="🚀")
     async def high_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -160,21 +162,23 @@ class ModelSelectionView(discord.ui.View):
             await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
             return
 
-        async with get_db_session() as session:
+        async with self.db_manager.get_session() as session:
             user_repo = UserRepository(session)
-            db_user = await user_repo.get_by_discord_id(str(interaction.user.id))
+            db_user = await user_repo.get_user_by_discord_id(str(interaction.user.id))
             if db_user:
                 db_user.model_preset = model_preset
+                await user_repo.update_user(session, db_user)
                 await session.commit()
                 await interaction.response.send_message(f"✅ 使用モデルを **{model_preset.capitalize()}** に変更しました。", ephemeral=True)
             else:
                 await interaction.response.send_message("ユーザー情報が見つかりません。", ephemeral=True)
 
 class DeleteConfirmView(discord.ui.View):
-    def __init__(self, user_id: int, api_repo: APIKeyRepository):
+    def __init__(self, user_id: int, db_manager: DatabaseManager, encryption_manager: EncryptionManager):
         super().__init__(timeout=60)
         self.user_id = user_id
-        self.api_repo = api_repo
+        self.db_manager = db_manager
+        self.encryption_manager = encryption_manager
 
     @discord.ui.button(label="削除する", style=discord.ButtonStyle.danger)
     async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -182,12 +186,12 @@ class DeleteConfirmView(discord.ui.View):
             await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
             return
 
-        async with get_db_session() as session:
+        async with self.db_manager.get_session() as session:
             user_repo = UserRepository(session)
             api_repo = APIKeyRepository(session)
-            db_user = await user_repo.get_by_discord_id(str(interaction.user.id))
+            db_user = await user_repo.get_user_by_discord_id(str(interaction.user.id))
             if db_user:
-                await api_repo.delete_key(db_user.id)
+                await api_repo.delete_key(session, db_user.id)
                 await session.commit()
                 await interaction.response.send_message("✅ 登録済みのAPIキーを削除しました。", ephemeral=True)
             else:
@@ -198,19 +202,23 @@ class DeleteConfirmView(discord.ui.View):
         await interaction.response.send_message("削除をキャンセルしました。", ephemeral=True)
 
 class SettingCog(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: commands.Bot):
         self.bot = bot
 
     @commands.hybrid_command(name="setting", description="ユーザー設定（APIキー・モデル等）を管理します")
     @has_permission(PermissionLevel.USER)
     async def setting(self, ctx: commands.Context):
         """Show the setting menu"""
-        async with get_db_session() as session:
+        async with self.bot.db_manager.get_session() as session:
             user_repo = UserRepository(session)
-            api_repo = APIKeyRepository(session)
             
             # Ensure user exists
-            await user_repo.get_or_create(str(ctx.author.id), ctx.author.name)
+            await user_repo.get_or_create_user(
+                session,
+                str(ctx.author.id),
+                ctx.author.name,
+                ctx.author.discriminator
+            )
             await session.commit()
             
             embed = discord.Embed(
@@ -219,12 +227,14 @@ class SettingCog(commands.Cog):
                 color=discord.Color.blue()
             )
             
-            view = SettingView(ctx.author.id, user_repo, api_repo)
+            view = SettingView(ctx.author.id, self.bot.db_manager, self.bot.encryption_manager)
             
             if ctx.interaction:
                 await ctx.interaction.response.send_message(embed=embed, view=view, ephemeral=True)
             else:
                 await ctx.send(embed=embed, view=view)
 
-async def setup(bot):
-    await bot.add_cog(SettingCog(bot))
+async def setup(bot: commands.Bot):
+    cog = SettingCog(bot)
+    await bot.add_cog(cog)
+    bot.tree.add_command(cog.setting)
