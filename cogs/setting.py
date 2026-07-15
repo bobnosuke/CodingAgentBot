@@ -59,21 +59,28 @@ class SettingView(discord.ui.View):
 
     async def show_status(self, interaction: discord.Interaction):
         async with get_db_session() as session:
+            from modules.database.repository import UsageLogRepository
             user_repo = UserRepository(session)
-            db_user = await user_repo.get_by_discord_id(str(interaction.user.id))
+            usage_repo = UsageLogRepository()
+            
+            db_user = await user_repo.get_user_by_discord_id(session, str(interaction.user.id))
             
             if not db_user:
                 await interaction.response.send_message("ユーザー情報が見つかりません。まずはコマンドを実行してください。", ephemeral=True)
                 return
 
-            # TODO: 実績や制限の取得ロジックを追加
+            # 本日の利用回数を取得
+            daily_count = await usage_repo.get_daily_usage_count(session, db_user.id)
+            limit = 50  # 要件定義書の制限
+            remaining = max(0, limit - daily_count)
+            
             embed = discord.Embed(
                 title="📊 利用状況確認",
                 color=discord.Color.green()
             )
             embed.add_field(name="使用モデル", value=db_user.model_preset.capitalize(), inline=True)
-            embed.add_field(name="本日の利用回数", value="開発中", inline=True)
-            embed.add_field(name="残り利用回数", value="無制限", inline=True)
+            embed.add_field(name="本日の利用回数", value=f"{daily_count} / {limit}", inline=True)
+            embed.add_field(name="残り利用回数", value=str(remaining), inline=True)
             
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
