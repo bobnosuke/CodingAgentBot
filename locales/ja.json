@@ -84,7 +84,18 @@
         "END_CONFIRM_TITLE": "⚠️ セッション終了の確認",
         "END_CONFIRM_DESC": "本当にこのセッションを終了しますか？\nチャンネルは削除されます。",
         "END_SUCCESS": "✅ セッションを終了しました。",
-        "END_CANCEL": "セッション終了をキャンセルしました。"
+        "END_CANCEL": "セッション終了をキャンセルしました。",
+        "REQUIREMENT_TITLE": "📝 要件の定義 (Gemini)",
+        "REQUIREMENT_SUMMARY": "タスク概要",
+        "REQUIREMENT_TECH": "技術要件",
+        "REQUIREMENT_PLAN": "実装計画",
+        "REQUIREMENT_READY": "✅ 要件が整いました。実装を開始しますか？",
+        "REQUIREMENT_NOT_READY": "ℹ️ まだ詳細が不足しています。追加で情報を教えてください。",
+        "APPROVE_BUTTON": "実装を開始する",
+        "REFINE_BUTTON": "修正を依頼する",
+        "IMPLEMENTING": "🚀 実装を開始します。少々お待ちください...",
+        "IMPLEMENTATION_SUCCESS": "✅ 実装が完了しました！",
+        "IMPLEMENTATION_ERROR": "❌ 実装中にエラーが発生しました: {error}"
     },
     "FILE": {
         "DOWNLOAD_TITLE": "📦 ファイルダウンロード",

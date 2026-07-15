@@ -1,6 +1,6 @@
 """
 Autonomous Agent logic for CoderAgent
-Handles multi-step planning and code generation in a single request
+Handles requirement definition and implementation in separate phases to optimize API usage.
 """
 import json
 import re
@@ -12,93 +12,89 @@ logger = setup_logger(__name__)
 
 class CodingAgent:
     """
-    Autonomous agent that handles planning, implementation, and verification
-    optimized for single-request execution.
+    Autonomous agent that handles:
+    Phase 1: Requirement Definition (Optimized for Gemini/Low-cost models)
+    Phase 2: One-shot Implementation (Optimized for High-performance models)
     """
     
     def __init__(self, ai_service: AIService):
         self.ai_service = ai_service
-        self.system_prompt = """You are an autonomous AI coding agent. Your goal is to complete the user's request in a single, comprehensive response.
-You must think step-by-step and provide:
-1. **Plan**: A detailed breakdown of the implementation steps.
-2. **Files**: All necessary code files with full content.
-3. **Verification**: How to verify the implementation.
 
-Your response must be in the following JSON format:
-{
-  "plan": ["step 1", "step 2", ...],
-  "files": [
-    {
-      "path": "filename.py",
-      "content": "full code here",
-      "description": "what this file does"
-    }
-  ],
-  "verification": "instructions to test",
-  "notes": "any important considerations"
-}
-
-Ensure all code is production-ready, includes comments, and handles errors.
-Respond ONLY with the JSON object."""
-
-    async def execute_task(
-        self, 
-        user_request: str, 
-        context: Dict[str, Any],
-        language: str = "ja"
-    ) -> Dict[str, Any]:
+    async def define_requirements(self, user_request: str, history: list = []) -> dict:
         """
-        Execute a coding task autonomously in a single request.
+        Phase 1: Define requirements.
+        Translates vague user requests into a structured JSON for implementation.
         """
-        logger.info(f"Executing autonomous task: {user_request[:50]}...")
+        from modules.ai.prompts_gemini import GEMINI_REQUIREMENT_PROMPT
         
-        # Construct context string
-        context_str = self._format_context(context)
+        logger.info(f"Defining requirements for: {user_request[:50]}...")
         
-        full_prompt = f"""User Request: {user_request}
-
-Current Project Context:
-{context_str}
-
-Please provide the complete implementation plan and code in the specified JSON format.
-Respond in {'Japanese' if language == 'ja' else 'English'} for the descriptions, but keep the JSON structure intact."""
-
-        # Call AI service
         response_text = ""
-        async for chunk in self.ai_service.chat(
-            user_message=full_prompt,
-            model=self.ai_service.current_model,
-            language=language,
-            system_override=self.system_prompt
-        ):
-            response_text += chunk
-        
-        # Parse JSON response
         try:
-            # Extract JSON if there's surrounding text
+            async for chunk in self.ai_service.chat(
+                user_message=user_request,
+                conversation_history=history,
+                system_override=GEMINI_REQUIREMENT_PROMPT,
+                language="ja"
+            ):
+                response_text += chunk
+            
+            # Extract JSON from response
             json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
             if json_match:
-                result = json.loads(json_match.group())
-                return result
+                return json.loads(json_match.group())
             else:
-                logger.error("No JSON found in AI response")
-                return {"error": "Failed to parse AI response", "raw": response_text}
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON decode error: {e}")
-            return {"error": "Invalid JSON format", "raw": response_text}
+                return {"error": "Failed to parse requirements JSON", "raw_response": response_text}
+        except Exception as e:
+            logger.error(f"Error in define_requirements: {e}")
+            return {"error": str(e)}
 
-    def _format_context(self, context: Dict[str, Any]) -> str:
-        """Format project context for the prompt"""
-        files = context.get("files", [])
-        file_list = "\n".join([f"- {f}" for f in files])
-        
-        history = context.get("history", [])
-        history_str = "\n".join([f"{h['role']}: {h['content'][:100]}..." for h in history[-3:]])
-        
-        return f"""
-Files in project:
-{file_list}
+    async def execute_task(self, requirement_json: dict, context: dict = None) -> dict:
+        """
+        Phase 2: Execute implementation.
+        Takes the requirement JSON and generates all necessary code files in one shot.
+        """
+        system_prompt = """あなたはエキスパート自律コーディングエージェントです。
+提供された技術仕様（JSON）に基づき、完動するコードを実装してください。
 
-Recent history:
-{history_str}
-"""
+### 出力形式:
+必ず以下の構造を持つ単一のJSONオブジェクトとして出力してください:
+{
+  "plan": ["ステップ1: ...", "ステップ2: ..."],
+  "files": [
+    {
+      "path": "ファイルパス",
+      "content": "ファイルの内容",
+      "description": "ファイルの説明"
+    }
+  ],
+  "verification": "テスト方法の説明",
+  "notes": "補足情報"
+}
+
+余計な解説は不要です。JSONのみを出力してください。"""
+
+        logger.info(f"Executing implementation for task: {requirement_json.get('task_summary', 'Unknown')}")
+        
+        user_msg = f"以下の仕様を実装してください: {json.dumps(requirement_json, ensure_ascii=False)}"
+        history = context.get("history", []) if context else []
+        
+        response_text = ""
+        try:
+            async for chunk in self.ai_service.chat(
+                user_message=user_msg,
+                conversation_history=history,
+                system_override=system_prompt,
+                language="ja"
+            ):
+                response_text += chunk
+            
+            # Extract JSON from response
+            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
+            if json_match:
+                return json.loads(json_match.group())
+            else:
+                return {"error": "Failed to parse implementation JSON", "raw_response": response_text}
+        except Exception as e:
+            logger.error(f"Error in execute_task: {e}")
+            return {"error": str(e)}

@@ -203,28 +203,40 @@ class CodingCog(commands.Cog):
                 
                 await MessageRepository.add_message(db_session, session_info["db_session_id"], "user", message.content)
                 
+                from modules.ai.agent import CodingAgent
+                from modules.ai.views import RequirementApprovalView
+                
+                agent = CodingAgent(ai_service)
                 response_msg = await message.reply(i18n.translate(lang, "CODING.THINKING"))
-                full_response = ""
-                chunk_counter = 0
                 
-                async for chunk in ai_service.chat(message.content, formatted_history, language=lang):
-                    full_response += chunk
-                    chunk_counter += 1
-                    if chunk_counter % 15 == 0:
-                        await response_msg.edit(content=full_response + " ▌")
+                # Phase 1: Requirement Definition
+                requirement_json = await agent.define_requirements(message.content, formatted_history)
                 
-                if full_response:
-                    await response_msg.edit(content=full_response)
-                    await MessageRepository.add_message(db_session, session_info["db_session_id"], "assistant", full_response)
-                    
-                    # Log usage and increment message count
-                    await UsageLogRepository.log_usage(
-                        db_session, 
-                        user.id, 
-                        ai_service.current_model
-                    )
+                if "error" in requirement_json:
+                    await response_msg.edit(content=i18n.translate(lang, "COMMON.ERROR", error=requirement_json["error"]))
+                    return
+
+                # Display Requirements to User
+                embed = discord.Embed(
+                    title=i18n.translate(lang, "CODING.REQUIREMENT_TITLE"),
+                    color=discord.Color.blue()
+                )
+                embed.add_field(name=i18n.translate(lang, "CODING.REQUIREMENT_SUMMARY"), value=requirement_json.get("task_summary", "---"), inline=False)
+                
+                tech_reqs = "\n".join([f"• {r}" for r in requirement_json.get("technical_requirements", [])])
+                embed.add_field(name=i18n.translate(lang, "CODING.REQUIREMENT_TECH"), value=tech_reqs or "---", inline=False)
+                
+                if requirement_json.get("is_ready"):
+                    embed.description = i18n.translate(lang, "CODING.REQUIREMENT_READY")
+                    view = RequirementApprovalView(agent, requirement_json, str(message.author.id), lang)
+                    # Note: In a real bot, we'd need to handle the approval flow properly with session management
+                    await response_msg.edit(content=None, embed=embed, view=view)
                 else:
-                    await response_msg.edit(content=i18n.translate(lang, "CODING.AI_EMPTY_RESPONSE"))
+                    embed.description = i18n.translate(lang, "CODING.REQUIREMENT_NOT_READY")
+                    await response_msg.edit(content=None, embed=embed)
+                
+                await MessageRepository.add_message(db_session, session_info["db_session_id"], "user", message.content)
+                await MessageRepository.add_message(db_session, session_info["db_session_id"], "assistant", json.dumps(requirement_json, ensure_ascii=False))
                 
                 await db_session.commit()
             except Exception as e:
