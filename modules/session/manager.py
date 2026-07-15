@@ -57,11 +57,16 @@ class SessionManager:
                 discord_user.discriminator
             )
             
+            # Get user's session count for naming
+            user_session_count = await SessionRepository.count_user_sessions(db_session, user.id)
+            session_num = str(user_session_count + 1).zfill(4)
+            default_name = f"{discord_user.name}-{session_num}"
+            
             # Create CodingRoom channel
             coding_room = await self._create_coding_room(
                 guild,
                 discord_user,
-                project_name or f"Session-{session_uuid[:8]}"
+                project_name or default_name
             )
             
             # Create session in database

@@ -247,6 +247,18 @@ class SessionRepository:
             logger.error(f"Error in count_active_sessions: {e}")
             raise
 
+    @staticmethod
+    async def count_user_sessions(session: AsyncSession, user_id: int) -> int:
+        """Count total sessions for a specific user"""
+        try:
+            from sqlalchemy import func
+            stmt = select(func.count(Session.id)).where(Session.user_id == user_id)
+            result = await session.execute(stmt)
+            return result.scalar() or 0
+        except Exception as e:
+            logger.error(f"Error in count_user_sessions: {e}")
+            raise
+
 
 class MessageRepository:
     """Repository for Message operations"""

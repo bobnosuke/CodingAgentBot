@@ -3,9 +3,10 @@ User settings commands for CoderAgent
 Handles API key management and model selection
 """
 import discord
-from discord import app_commands
 from discord.ext import commands
+from discord import app_commands
 import logging
+from typing import Any
 from typing import Optional
 
 from modules.database.repository import UserRepository, APIKeyRepository, UsageLogRepository
@@ -344,21 +345,17 @@ class SettingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @app_commands.command(name="setting", description="ユーザー設定（APIキー・モデル等）を管理します")
-    @PermissionManager.has_permission(PermissionLevel.USER)
-    async def setting(self, interaction: discord.Interaction):
-        """Show the setting menu"""
+    async def _send_setting_panel(self, target: Any, user: discord.User, ephemeral: bool = True):
+        """Helper to send setting panel to interaction or context"""
         try:
-            await interaction.response.defer(ephemeral=True)
-            
             db_session = self.bot.db_manager.get_session()
             try:
                 # Ensure user exists
                 await UserRepository.get_or_create_user(
                     db_session,
-                    str(interaction.user.id),
-                    interaction.user.name,
-                    interaction.user.discriminator
+                    str(user.id),
+                    user.name,
+                    user.discriminator
                 )
                 await db_session.commit()
                 
@@ -369,20 +366,38 @@ class SettingCog(commands.Cog):
                 )
                 embed.set_footer(text="Made by RovaexTeam")
                 
-                view = SettingView(interaction.user.id, self.bot.db_manager, self.bot.encryption_manager)
+                view = SettingView(user.id, self.bot.db_manager, self.bot.encryption_manager)
                 
-                await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+                if isinstance(target, discord.Interaction):
+                    await target.followup.send(embed=embed, view=view, ephemeral=ephemeral)
+                else:
+                    await target.send(embed=embed, view=view)
             finally:
                 await db_session.close()
         except Exception as e:
-            logger.error(f"Error in setting command: {e}", exc_info=True)
-            embed = discord.Embed(
+            logger.error(f"Error in setting panel: {e}", exc_info=True)
+            error_embed = discord.Embed(
                 title="❌ エラー",
                 description=f"設定メニューの表示中にエラーが発生しました: {str(e)}",
                 color=discord.Color.red()
             )
-            embed.set_footer(text="Made by RovaexTeam")
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            error_embed.set_footer(text="Made by RovaexTeam")
+            if isinstance(target, discord.Interaction):
+                await target.followup.send(embed=error_embed, ephemeral=ephemeral)
+            else:
+                await target.send(embed=error_embed)
+
+    @app_commands.command(name="setting", description="ユーザー設定（APIキー・モデル等）を管理します")
+    @PermissionManager.has_permission(PermissionLevel.USER)
+    async def setting_slash(self, interaction: discord.Interaction):
+        """Show the setting menu via slash command"""
+        await interaction.response.defer(ephemeral=True)
+        await self._send_setting_panel(interaction, interaction.user, ephemeral=True)
+
+    @commands.command(name="setting", description="設定画面を直接表示します")
+    async def setting_prefix(self, ctx: commands.Context):
+        """Show the setting menu via prefix command"""
+        await self._send_setting_panel(ctx, ctx.author, ephemeral=False)
 
 
 async def setup(bot: commands.Bot):
