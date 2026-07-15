@@ -2535,19 +2535,22 @@ Botを安全停止する。
 ⸻
  
 5. コマンド一覧表
-コマンド	Prefix	対象	用途
-/setting	!setting	全員	API・モデル設定
-/coding start	!coding start	全員	AI開発開始
-/coding end	!coding end	全員	開発終了
-/coding panel	!coding panel	管理者	操作パネル設置
-/coding list	!coding list	全員	プロジェクト一覧
-/coding info	!coding info	全員	詳細確認
-/coding export	!coding export	全員	ZIP取得
-/coding rename	!coding rename	全員	名前変更
-/coding delete	!coding delete	全員	削除
-/config	!config	管理者	サーバー設定
-/health	!health	Owner	状態確認
-/stats	!stats	Owner	統計確認
-/shutdown	!shutdown	Owner	Bot停止
+CoderAgentは、以下のコマンドを提供します。
+
+| コマンド | Prefix | 対象 | 用途 |
+|:---|:---|:---|:---|
+| `/coding panel` | - | 管理者専用 | 開発用 Embed パネルと Select メニューを表示します。 |
+| `/coding server` | - | 管理者専用 | コマンド実行サーバー内で作業中のプロジェクト数、モデルの利用分布、その他便利なデータを表示します。 |
+| `/setting` | `!setting` | 全員 | ユーザー設定表示用 Embed パネルを表示します。 |
+| `/guide` | `!guide` | 全員 | CoderAgentBot の使い方を Embed パネルで表示します。 |
+| `/config` | - | サーバー管理者専用 | サーバー単位の設定を Embed パネルで操作します。 |
+| `/health` | - | Bot運営オーナー専用 | DB 接続や API 状態などの健全性を確認できる Embed パネルを表示します。 |
+| `/stats` | - | Bot運営オーナー専用 | 全サーバーの利用統計を見やすく表示します。 |
+| `/shutdown` | - | Bot運営オーナー専用 | ボット本体を安全に停止します。 |
+| `!list` | - | CodingRoom内 | プロジェクト内のファイルを階層構造で分かりやすく表示します。 |
+| `!get` | - | CodingRoom内 | 実行後に Select メニューで表示するファイルを選択させ、選んだファイルをコードブロックで表示します。 |
+| `!download` | - | CodingRoom内 | プロジェクト内のファイル一覧を Select メニューで表示し、選択したファイルをZIPにまとめて送信します。 |
+| `!close` | - | CodingRoom内 | CodingRoom とセッション情報を全て完全に削除します。 |
+| `!readme` | - | CodingRoom内 | プロジェクトの README を表示します。 |
  
 ⸻
