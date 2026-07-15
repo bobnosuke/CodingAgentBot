@@ -8,8 +8,49 @@ from discord import app_commands
 from logger import setup_logger
 from modules.file.manager import FileManager
 from modules.session.manager import SessionManager
+from pathlib import Path
+import zipfile
+import io
 
 logger = setup_logger(__name__)
+
+
+class FileSelectView(discord.ui.View):
+    """View for file selection with multi-select"""
+    
+    def __init__(self, files: list, session_uuid: str, file_manager: FileManager):
+        super().__init__(timeout=300)
+        self.files = files
+        self.session_uuid = session_uuid
+        self.file_manager = file_manager
+        self.selected_files = []
+        
+        # Create select menu with file options
+        options = [
+            discord.SelectOption(label=f, value=f, emoji="📄")
+            for f in files
+        ]
+        
+        select = discord.ui.Select(
+            placeholder="ダウンロードするファイルを選択してください",
+            options=options,
+            max_values=len(files)
+        )
+        select.callback = self.select_callback
+        self.add_item(select)
+        
+        # Add "Download All" button
+        download_all_btn = discord.ui.Button(label="全てダウンロード", style=discord.ButtonStyle.green, emoji="⬇️")
+        download_all_btn.callback = self.download_all_callback
+        self.add_item(download_all_btn)
+    
+    async def select_callback(self, interaction: discord.Interaction):
+        self.selected_files = interaction.data["values"]
+        await interaction.response.defer()
+    
+    async def download_all_callback(self, interaction: discord.Interaction):
+        self.selected_files = self.files
+        await interaction.response.defer()
 
 
 class FileCog(commands.Cog):
@@ -26,276 +67,295 @@ class FileCog(commands.Cog):
         self.file_manager = FileManager()
         self.session_manager = SessionManager(bot)
     
-    def _check_coding_room(self, interaction: discord.Interaction, session_uuid: str) -> bool:
+    def _check_coding_room(self, message: discord.Message, session_uuid: str) -> bool:
         """
         Check if command is being used in the correct CodingRoom
         
         Args:
-            interaction: Discord interaction
+            message: Discord message
             session_uuid: Session UUID
         
         Returns:
             True if in correct room, False otherwise
         """
         session_info = self.session_manager.get_session(session_uuid)
-        if session_info and str(interaction.channel.id) != session_info["channel_id"]:
+        if session_info and str(message.channel.id) != session_info["channel_id"]:
             return False
         return True
     
-    @app_commands.command(name="save", description="Save a file in your coding session")
-    async def save_file(self, interaction: discord.Interaction, filename: str, content: str):
-        """
-        Save a file in the current session
-        
-        Args:
-            interaction: Discord interaction
-            filename: Name of the file to save
-            content: File content
-        """
-        try:
-            user_id = str(interaction.user.id)
-            
-            # Check if user has active session
-            session_uuid = self.session_manager.get_user_active_session(user_id)
-            
-            if not session_uuid:
-                await interaction.response.send_message(
-                    "❌ You don't have an active coding session.",
-                    ephemeral=True
-                )
-                return
-            
-            # Check if this command is being used in the correct CodingRoom
-            if not self._check_coding_room(interaction, session_uuid):
-                await interaction.response.send_message(
-                    "❌ This command can only be used in your coding room!",
-                    ephemeral=True
-                )
-                return
-            
-            # Save file
-            file_path = self.file_manager.save_file(session_uuid, filename, content)
-            
-            # Get file size
-            file_size = file_path.stat().st_size
-            
-            embed = discord.Embed(
-                title="✅ File Saved",
-                description=f"File `{filename}` has been saved.",
-                color=discord.Color.green()
-            )
-            embed.add_field(name="Filename", value=f"`{filename}`", inline=False)
-            embed.add_field(name="Size", value=f"{file_size} bytes", inline=False)
-            
-            await interaction.response.send_message(embed=embed)
-            
-            logger.info(f"User {user_id} saved file {filename} in session {session_uuid}")
-        
-        except Exception as e:
-            logger.error(f"Error in save_file: {e}", exc_info=True)
-            await interaction.response.send_message(
-                f"❌ Error saving file: {str(e)}",
-                ephemeral=True
-            )
-    
-    @app_commands.command(name="list", description="List all files in your coding session")
-    async def list_files(self, interaction: discord.Interaction):
+    @commands.command(name="list", description="List all files in your coding session")
+    async def list_files(self, ctx: commands.Context):
         """
         List all files in the current session
         
         Args:
-            interaction: Discord interaction
+            ctx: Command context
         """
         try:
-            user_id = str(interaction.user.id)
+            user_id = str(ctx.author.id)
             
             # Check if user has active session
             session_uuid = self.session_manager.get_user_active_session(user_id)
             
             if not session_uuid:
-                await interaction.response.send_message(
-                    "❌ You don't have an active coding session.",
-                    ephemeral=True
-                )
+                await ctx.send("❌ You don't have an active coding session.")
                 return
             
             # Check if this command is being used in the correct CodingRoom
-            if not self._check_coding_room(interaction, session_uuid):
-                await interaction.response.send_message(
-                    "❌ This command can only be used in your coding room!",
-                    ephemeral=True
-                )
+            if not self._check_coding_room(ctx.message, session_uuid):
+                await ctx.send("❌ This command can only be used in your coding room!")
                 return
             
-            # List files
+            # Get file list
             files = self.file_manager.list_files(session_uuid)
             
             if not files:
-                await interaction.response.send_message("📁 No files in this session yet.")
+                await ctx.send("📭 No files in this session yet.")
                 return
             
-            # Get session size
-            session_size = self.file_manager.get_session_size(session_uuid)
-            
-            file_list = "\n".join([f"• `{f}`" for f in files])
-            
             embed = discord.Embed(
-                title="📁 Session Files",
-                description=file_list,
+                title="📋 Files in Session",
+                description=f"Total: {len(files)} file(s)",
                 color=discord.Color.blue()
             )
-            embed.add_field(name="File Count", value=str(len(files)), inline=True)
-            embed.add_field(name="Total Size", value=f"{session_size} bytes", inline=True)
             
-            await interaction.response.send_message(embed=embed)
+            # Display files in hierarchical format
+            for file in files:
+                file_path = Path(file)
+                file_size = file_path.stat().st_size
+                embed.add_field(
+                    name=f"📄 {file}",
+                    value=f"Size: {file_size} bytes",
+                    inline=False
+                )
+            
+            embed.set_footer(text="Made by RovaexTeam")
+            await ctx.send(embed=embed)
+            
+            logger.info(f"User {user_id} listed files in session {session_uuid}")
         
         except Exception as e:
             logger.error(f"Error in list_files: {e}", exc_info=True)
-            await interaction.response.send_message(
-                f"❌ Error listing files: {str(e)}",
-                ephemeral=True
-            )
+            await ctx.send(f"❌ Error listing files: {str(e)}")
     
-    @app_commands.command(name="download", description="Download all session files as ZIP")
-    async def download_files(self, interaction: discord.Interaction):
+    @commands.command(name="get", description="Get file content")
+    async def get_file(self, ctx: commands.Context, filename: str):
         """
-        Download all session files as ZIP
+        Get file content
         
         Args:
-            interaction: Discord interaction
+            ctx: Command context
+            filename: Name of the file to retrieve
         """
         try:
-            user_id = str(interaction.user.id)
+            user_id = str(ctx.author.id)
             
             # Check if user has active session
             session_uuid = self.session_manager.get_user_active_session(user_id)
             
             if not session_uuid:
-                await interaction.response.send_message(
-                    "❌ You don't have an active coding session.",
-                    ephemeral=True
-                )
+                await ctx.send("❌ You don't have an active coding session.")
                 return
             
             # Check if this command is being used in the correct CodingRoom
-            if not self._check_coding_room(interaction, session_uuid):
-                await interaction.response.send_message(
-                    "❌ This command can only be used in your coding room!",
-                    ephemeral=True
-                )
+            if not self._check_coding_room(ctx.message, session_uuid):
+                await ctx.send("❌ This command can only be used in your coding room!")
                 return
             
-            # Check if there are any files
-            files = self.file_manager.list_files(session_uuid)
-            
-            if not files:
-                await interaction.response.send_message(
-                    "❌ No files to download in this session.",
-                    ephemeral=True
-                )
-                return
-            
-            # Defer response
-            await interaction.response.defer()
-            
-            zip_path = self.file_manager.create_zip(session_uuid)
-            
-            # Check file size (Discord limit is 25MB)
-            zip_size = zip_path.stat().st_size
-            
-            if zip_size > 25 * 1024 * 1024:
-                await interaction.followup.send(
-                    f"❌ ZIP file is too large ({zip_size / 1024 / 1024:.1f}MB). "
-                    f"Discord limit is 25MB."
-                )
-                return
-            
-            # Send file
-            file = discord.File(zip_path, filename=f"{session_uuid}.zip")
-            
-            embed = discord.Embed(
-                title="✅ Files Ready for Download",
-                description=f"Your session files are ready to download.",
-                color=discord.Color.green()
-            )
-            embed.add_field(name="File Count", value=str(len(files)), inline=True)
-            embed.add_field(name="ZIP Size", value=f"{zip_size / 1024:.1f}KB", inline=True)
-            
-            await interaction.followup.send(embed=embed, file=file)
-            
-            logger.info(f"User {user_id} downloaded files from session {session_uuid}")
-        
-        except Exception as e:
-            logger.error(f"Error in download_files: {e}", exc_info=True)
-            await interaction.followup.send(f"❌ Error downloading files: {str(e)}")
-    
-    @app_commands.command(name="get", description="Get content of a specific file")
-    async def get_file(self, interaction: discord.Interaction, filename: str):
-        """
-        Get content of a specific file
-        
-        Args:
-            interaction: Discord interaction
-            filename: Name of the file
-        """
-        try:
-            user_id = str(interaction.user.id)
-            
-            # Check if user has active session
-            session_uuid = self.session_manager.get_user_active_session(user_id)
-            
-            if not session_uuid:
-                await interaction.response.send_message(
-                    "❌ You don't have an active coding session.",
-                    ephemeral=True
-                )
-                return
-            
-            # Check if this command is being used in the correct CodingRoom
-            if not self._check_coding_room(interaction, session_uuid):
-                await interaction.response.send_message(
-                    "❌ This command can only be used in your coding room!",
-                    ephemeral=True
-                )
-                return
-            
-            # Get file
+            # Get file content
             content = self.file_manager.get_file(session_uuid, filename)
             
-            if content is None:
-                await interaction.response.send_message(
-                    f"❌ File not found: `{filename}`",
-                    ephemeral=True
-                )
+            if not content:
+                await ctx.send(f"❌ File `{filename}` not found.")
                 return
             
-            # Send file content (split if too long)
+            # Send content as code block or file
             if len(content) > 2000:
-                # Send as code blocks
-                chunks = [content[i:i+1990] for i in range(0, len(content), 1990)]
-                
-                await interaction.response.send_message(
-                    f"📄 File: `{filename}` (Part 1/{len(chunks)})"
-                )
-                
-                for i, chunk in enumerate(chunks, 1):
-                    await interaction.followup.send(f"```\n{chunk}\n```")
-                    
-                    if i < len(chunks):
-                        await interaction.followup.send(f"(Part {i+1}/{len(chunks)})")
+                # Send as file
+                file_obj = io.BytesIO(content.encode('utf-8'))
+                await ctx.send(file=discord.File(file_obj, filename=filename))
             else:
-                await interaction.response.send_message(
-                    f"📄 File: `{filename}`\n```\n{content}\n```"
+                # Send as code block
+                embed = discord.Embed(
+                    title=f"📄 {filename}",
+                    description=f"```\n{content}\n```",
+                    color=discord.Color.blue()
                 )
+                embed.set_footer(text="Made by RovaexTeam")
+                await ctx.send(embed=embed)
+            
+            logger.info(f"User {user_id} retrieved file {filename} in session {session_uuid}")
         
         except Exception as e:
             logger.error(f"Error in get_file: {e}", exc_info=True)
-            await interaction.response.send_message(
-                f"❌ Error retrieving file: {str(e)}",
-                ephemeral=True
+            await ctx.send(f"❌ Error retrieving file: {str(e)}")
+    
+    @commands.command(name="download", description="Download files as ZIP")
+    async def download_files(self, ctx: commands.Context):
+        """
+        Download files as ZIP
+        
+        Args:
+            ctx: Command context
+        """
+        try:
+            user_id = str(ctx.author.id)
+            
+            # Check if user has active session
+            session_uuid = self.session_manager.get_user_active_session(user_id)
+            
+            if not session_uuid:
+                await ctx.send("❌ You don't have an active coding session.")
+                return
+            
+            # Check if this command is being used in the correct CodingRoom
+            if not self._check_coding_room(ctx.message, session_uuid):
+                await ctx.send("❌ This command can only be used in your coding room!")
+                return
+            
+            # Get file list
+            files = self.file_manager.list_files(session_uuid)
+            
+            if not files:
+                await ctx.send("📭 No files to download.")
+                return
+            
+            # If only one file, send it directly
+            if len(files) == 1:
+                file_path = Path(self.file_manager.get_session_dir(session_uuid)) / files[0]
+                await ctx.send(file=discord.File(file_path))
+                logger.info(f"User {user_id} downloaded single file in session {session_uuid}")
+                return
+            
+            # Create ZIP with multiple files
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for file in files:
+                    file_path = Path(self.file_manager.get_session_dir(session_uuid)) / file
+                    if file_path.exists():
+                        zip_file.write(file_path, arcname=file)
+            
+            zip_buffer.seek(0)
+            await ctx.send(file=discord.File(zip_buffer, filename=f"session_{session_uuid[:8]}.zip"))
+            
+            logger.info(f"User {user_id} downloaded {len(files)} files as ZIP in session {session_uuid}")
+        
+        except Exception as e:
+            logger.error(f"Error in download_files: {e}", exc_info=True)
+            await ctx.send(f"❌ Error downloading files: {str(e)}")
+    
+    @commands.command(name="close", description="Close your coding session")
+    async def close_session(self, ctx: commands.Context):
+        """
+        Close the current coding session with confirmation
+        
+        Args:
+            ctx: Command context
+        """
+        try:
+            user_id = str(ctx.author.id)
+            
+            # Check if user has active session
+            session_uuid = self.session_manager.get_user_active_session(user_id)
+            
+            if not session_uuid:
+                await ctx.send("❌ You don't have an active coding session.")
+                return
+            
+            # Check if this command is being used in the correct CodingRoom
+            if not self._check_coding_room(ctx.message, session_uuid):
+                await ctx.send("❌ This command can only be used in your coding room!")
+                return
+            
+            # Create confirmation view
+            class ConfirmView(discord.ui.View):
+                def __init__(self, session_manager, session_uuid, ctx):
+                    super().__init__(timeout=60)
+                    self.session_manager = session_manager
+                    self.session_uuid = session_uuid
+                    self.ctx = ctx
+                
+                @discord.ui.button(label="はい", style=discord.ButtonStyle.danger, emoji="✅")
+                async def confirm_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                    if interaction.user.id != self.ctx.author.id:
+                        await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
+                        return
+                    
+                    await self.session_manager.end_session(self.session_uuid)
+                    await interaction.response.send_message("✅ セッションを終了しました。", ephemeral=True)
+                
+                @discord.ui.button(label="いいえ", style=discord.ButtonStyle.secondary, emoji="❌")
+                async def cancel_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+                    if interaction.user.id != self.ctx.author.id:
+                        await interaction.response.send_message("この操作は実行者本人のみ可能です。", ephemeral=True)
+                        return
+                    
+                    await interaction.response.send_message("セッションの終了をキャンセルしました。", ephemeral=True)
+            
+            embed = discord.Embed(
+                title="⚠️ セッション終了確認",
+                description="本当にセッションを終了しますか？\n終了するとこのチャンネルは削除されます。",
+                color=discord.Color.red()
             )
+            embed.set_footer(text="Made by RovaexTeam")
+            
+            view = ConfirmView(self.session_manager, session_uuid, ctx)
+            await ctx.send(embed=embed, view=view)
+        
+        except Exception as e:
+            logger.error(f"Error in close_session: {e}", exc_info=True)
+            await ctx.send(f"❌ Error closing session: {str(e)}")
+    
+    @commands.command(name="readme", description="Show project README")
+    async def show_readme(self, ctx: commands.Context):
+        """
+        Show project README
+        
+        Args:
+            ctx: Command context
+        """
+        try:
+            user_id = str(ctx.author.id)
+            
+            # Check if user has active session
+            session_uuid = self.session_manager.get_user_active_session(user_id)
+            
+            if not session_uuid:
+                await ctx.send("❌ You don't have an active coding session.")
+                return
+            
+            # Check if this command is being used in the correct CodingRoom
+            if not self._check_coding_room(ctx.message, session_uuid):
+                await ctx.send("❌ This command can only be used in your coding room!")
+                return
+            
+            # Try to get README
+            readme_content = self.file_manager.get_file(session_uuid, "README.md")
+            
+            if not readme_content:
+                await ctx.send("📭 No README.md found in this session.")
+                return
+            
+            # Send README content
+            if len(readme_content) > 2000:
+                file_obj = io.BytesIO(readme_content.encode('utf-8'))
+                await ctx.send(file=discord.File(file_obj, filename="README.md"))
+            else:
+                embed = discord.Embed(
+                    title="📖 README.md",
+                    description=readme_content,
+                    color=discord.Color.blue()
+                )
+                embed.set_footer(text="Made by RovaexTeam")
+                await ctx.send(embed=embed)
+            
+            logger.info(f"User {user_id} viewed README in session {session_uuid}")
+        
+        except Exception as e:
+            logger.error(f"Error in show_readme: {e}", exc_info=True)
+            await ctx.send(f"❌ Error showing README: {str(e)}")
 
 
 async def setup(bot: commands.Bot):
-    """Setup function for loading cog"""
-    await bot.add_cog(FileCog(bot))
+    cog = FileCog(bot)
+    await bot.add_cog(cog)
