@@ -1,17 +1,206 @@
-    """
-    Coding commands for CoderAgent
-    Handles /coding start, /coding end commands and AI chat in CodingRooms
-    """
+"""
+Coding commands for CoderAgent
+Handles /coding start, /coding end commands and AI chat in CodingRooms
+"""
 import discord
 from discord.ext import commands
 from discord import app_commands
 from logger import setup_logger
 from modules.security.permissions import PermissionLevel, PermissionManager
-from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository
+from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository
 from modules.session.manager import SessionManager
 from modules.ai.openrouter import OpenRouterClient, AIService
 
 logger = setup_logger(__name__)
+
+
+class CodingPanelView(discord.ui.View):
+    """View for /coding panel with Select Menu and Buttons"""
+    
+    def __init__(self, bot: commands.Bot, user_id: int):
+        super().__init__(timeout=300)
+        self.bot = bot
+        self.user_id = user_id
+        self.session_manager = SessionManager(bot)
+    
+    @discord.ui.select(
+        placeholder="🎯 操作を選択してください",
+        options=[
+            discord.SelectOption(
+                label="開発開始",
+                value="start",
+                emoji="🚀",
+                description="新しいコーディングセッションを開始します"
+            ),
+            discord.SelectOption(
+                label="プロジェクト一覧",
+                value="list",
+                emoji="📋",
+                description="あなたのプロジェクト一覧を表示します"
+            ),
+            discord.SelectOption(
+                label="プロジェクト詳細",
+                value="info",
+                emoji="ℹ️",
+                description="プロジェクトの詳細情報を確認します"
+            ),
+            discord.SelectOption(
+                label="プロジェクト名変更",
+                value="rename",
+                emoji="✏️",
+                description="プロジェクト名を変更します"
+            ),
+        ]
+    )
+    async def panel_select(self, interaction: discord.Interaction, select: discord.ui.Select):
+        """Handle panel selection"""
+        await interaction.response.defer(ephemeral=True)
+        
+        action = select.values[0]
+        
+        if action == "start":
+            await self._handle_start(interaction)
+        elif action == "list":
+            await self._handle_list(interaction)
+        elif action == "info":
+            await self._handle_info(interaction)
+        elif action == "rename":
+            await self._handle_rename(interaction)
+    
+    async def _handle_start(self, interaction: discord.Interaction):
+        """Handle start action"""
+        user_id = str(interaction.user.id)
+        
+        # Check if user already has active session
+        active_session = self.session_manager.get_user_active_session(user_id)
+        
+        if active_session:
+            await interaction.followup.send(
+                f"❌ You already have an active session: `{active_session[:8]}`\n"
+                f"Use `/coding end` to close it first.",
+                ephemeral=True
+            )
+            return
+        
+        # Get database session
+        db_session = self.bot.db_manager.get_session()
+        
+        try:
+            # Get or create user
+            user = await UserRepository.get_or_create_user(
+                db_session,
+                user_id,
+                interaction.user.name,
+                interaction.user.discriminator
+            )
+            
+            # Check if user has API key
+            api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
+            
+            if not api_key:
+                await interaction.followup.send(
+                    "❌ No OpenRouter API key found!\n"
+                    "Please register your API key first using `/setting`",
+                    ephemeral=True
+                )
+                return
+            
+            # Decrypt API key
+            decrypted_key = self.bot.encryption_manager.decrypt(api_key.encrypted_key)
+            
+            # Create session and CodingRoom
+            session_uuid, coding_room = await self.session_manager.create_session(
+                db_session,
+                interaction.user,
+                interaction.guild,
+                "New Project"
+            )
+            
+            # Initialize AI service for this user
+            model_preset = getattr(user, "model_preset", "balance")
+            
+            openrouter_client = OpenRouterClient(decrypted_key)
+            ai_service = AIService(openrouter_client)
+            ai_service.set_model_by_preset(model_preset)
+            
+            # Send success message
+            embed = discord.Embed(
+                title="✅ Coding Session Started",
+                description=f"Your private coding room has been created!",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="Session ID", value=f"`{session_uuid[:8]}`", inline=False)
+            embed.add_field(name="Channel", value=coding_room.mention, inline=False)
+            embed.add_field(
+                name="Next Steps",
+                value="1. Go to your coding room\n"
+                      "2. Just type your message to chat with AI\n"
+                      "3. Use `/coding end` when done",
+                inline=False
+            )
+            embed.set_footer(text="Made by RovaexTeam")
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+            # Send welcome message in coding room
+            welcome_embed = discord.Embed(
+                title="🤖 Welcome to your Coding Session",
+                description="I'm your AI coding assistant. Tell me what you'd like to build!",
+                color=discord.Color.blue()
+            )
+            welcome_embed.add_field(
+                name="Examples",
+                value="• `Create a Discord bot`\n"
+                      "• `Add login functionality`\n"
+                      "• `Fix this code: ...`\n"
+                      "• `Explain how decorators work`",
+                inline=False
+            )
+            welcome_embed.add_field(
+                name="Tips",
+                value="• Use `!list` to see all saved files\n"
+                      "• Use `!get <filename>` to view file content\n"
+                      "• Use `!download` to download all files as ZIP",
+                inline=False
+            )
+            welcome_embed.set_footer(text="Made by RovaexTeam")
+            
+            await coding_room.send(embed=welcome_embed)
+            
+            logger.info(f"Created session {session_uuid} for {interaction.user.name}")
+        
+        except Exception as e:
+            logger.error(f"Error in _handle_start: {e}", exc_info=True)
+            await interaction.followup.send(
+                f"❌ Error starting session: {str(e)}",
+                ephemeral=True
+            )
+        finally:
+            await db_session.close()
+    
+    async def _handle_list(self, interaction: discord.Interaction):
+        """Handle list action"""
+        await interaction.followup.send(
+            "📋 **プロジェクト一覧機能は準備中です。**\n"
+            "現在のセッションで作成されたプロジェクトは、`/coding end` で確認できます。",
+            ephemeral=True
+        )
+    
+    async def _handle_info(self, interaction: discord.Interaction):
+        """Handle info action"""
+        await interaction.followup.send(
+            "ℹ️ **プロジェクト詳細機能は準備中です。**\n"
+            "プロジェクトの詳細情報は、`!readme` コマンドで確認できます。",
+            ephemeral=True
+        )
+    
+    async def _handle_rename(self, interaction: discord.Interaction):
+        """Handle rename action"""
+        await interaction.followup.send(
+            "✏️ **プロジェクト名変更機能は準備中です。**\n"
+            "セッション開始時に `project_name` パラメータを指定することで、プロジェクト名を設定できます。",
+            ephemeral=True
+        )
 
 
 class CodingCog(commands.Cog):
@@ -29,6 +218,54 @@ class CodingCog(commands.Cog):
         self.ai_services = {}  # Cache for AI services per user
     
     coding_group = app_commands.Group(name="coding", description="AI coding commands")
+    
+    @coding_group.command(name="panel", description="Show coding control panel")
+    @PermissionManager.has_permission(PermissionLevel.ADMIN)
+    async def coding_panel(self, interaction: discord.Interaction):
+        """
+        Show coding control panel with Select Menu
+        
+        Args:
+            interaction: Discord interaction
+        """
+        try:
+            embed = discord.Embed(
+                title="🎮 Coding Control Panel",
+                description="以下のメニューから操作を選択してください。",
+                color=discord.Color.blue()
+            )
+            embed.add_field(
+                name="🚀 開発開始",
+                value="新しいコーディングセッションを開始します",
+                inline=False
+            )
+            embed.add_field(
+                name="📋 プロジェクト一覧",
+                value="あなたのプロジェクト一覧を表示します",
+                inline=False
+            )
+            embed.add_field(
+                name="ℹ️ プロジェクト詳細",
+                value="プロジェクトの詳細情報を確認します",
+                inline=False
+            )
+            embed.add_field(
+                name="✏️ プロジェクト名変更",
+                value="プロジェクト名を変更します",
+                inline=False
+            )
+            embed.set_footer(text="Made by RovaexTeam")
+            
+            view = CodingPanelView(self.bot, interaction.user.id)
+            
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        
+        except Exception as e:
+            logger.error(f"Error in coding_panel: {e}", exc_info=True)
+            await interaction.response.send_message(
+                f"❌ Error: {str(e)}",
+                ephemeral=True
+            )
     
     @coding_group.command(name="start", description="Start a new coding session")
     async def coding_start(self, interaction: discord.Interaction, project_name: str = None):
@@ -73,7 +310,7 @@ class CodingCog(commands.Cog):
                 if not api_key:
                     await interaction.followup.send(
                         "❌ No OpenRouter API key found!\n"
-                        "Please register your API key first using `/api-key register`",
+                        "Please register your API key first using `/setting`",
                         ephemeral=True
                     )
                     return
@@ -86,7 +323,7 @@ class CodingCog(commands.Cog):
                     db_session,
                     interaction.user,
                     interaction.guild,
-                    project_name
+                    project_name or "New Project"
                 )
                 
                 # Initialize AI service for this user
@@ -117,7 +354,7 @@ class CodingCog(commands.Cog):
                           "3. Use `/coding end` when done",
                     inline=False
                 )
-                embed.set_footer(text="Your coding room is private - only you, the bot, and admins can see it")
+                embed.set_footer(text="Made by RovaexTeam")
                 
                 await interaction.followup.send(embed=embed, ephemeral=True)
                 
@@ -137,11 +374,12 @@ class CodingCog(commands.Cog):
                 )
                 welcome_embed.add_field(
                     name="Tips",
-                    value="• Use `/save` to save generated code\n"
-                          "• Use `/list` to see all saved files\n"
-                          "• Use `/download` to download all files as ZIP",
+                    value="• Use `!list` to see all saved files\n"
+                          "• Use `!get <filename>` to view file content\n"
+                          "• Use `!download` to download all files as ZIP",
                     inline=False
                 )
+                welcome_embed.set_footer(text="Made by RovaexTeam")
                 
                 await coding_room.send(embed=welcome_embed)
                 
@@ -251,50 +489,38 @@ class CodingCog(commands.Cog):
                 )
                 return
             
+            # Defer response
             await interaction.response.defer(ephemeral=True)
             
-            # Get database session
-            db_session = self.bot.db_manager.get_session()
+            # End session
+            await self.session_manager.end_session(session_uuid)
             
-            try:
-                session_info = self.session_manager.get_session(session_uuid)
-                
-                # Close session
-                await self.session_manager.close_session(
-                    db_session,
-                    session_uuid,
-                    delete_channel=True
-                )
-                
-                # Remove AI service
-                if user_id in self.ai_services:
-                    del self.ai_services[user_id]
-                
-                await interaction.followup.send(
-                    f"✅ Session `{session_uuid[:8]}` closed.\n"
-                    f"Your coding room has been deleted.",
-                    ephemeral=True
-                )
-                
-                logger.info(f"Closed session {session_uuid} for {interaction.user.name}")
+            # Clean up AI service
+            if user_id in self.ai_services:
+                del self.ai_services[user_id]
             
-            finally:
-                await db_session.close()
+            embed = discord.Embed(
+                title="✅ Coding Session Ended",
+                description="Your coding room has been closed.",
+                color=discord.Color.green()
+            )
+            embed.add_field(name="Session ID", value=f"`{session_uuid[:8]}`", inline=False)
+            embed.set_footer(text="Made by RovaexTeam")
+            
+            await interaction.followup.send(embed=embed, ephemeral=True)
+            
+            logger.info(f"Ended session {session_uuid} for {interaction.user.name}")
         
         except Exception as e:
             logger.error(f"Error in coding_end: {e}", exc_info=True)
             await interaction.response.send_message(
-                f"❌ Error closing session: {str(e)}",
+                f"❌ Error ending session: {str(e)}",
                 ephemeral=True
             )
 
 
 async def setup(bot: commands.Bot):
-    """Setup function for loading cog"""
     cog = CodingCog(bot)
     await bot.add_cog(cog)
-    # Add command group to app commands tree
     if cog.coding_group not in bot.tree.get_commands():
         bot.tree.add_command(cog.coding_group)
-    
-
