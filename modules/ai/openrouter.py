@@ -169,7 +169,8 @@ When generating code:
         user_message: str,
         conversation_history: List[Dict[str, str]] = None,
         model: Optional[str] = None,
-        language: str = "en-US"
+        language: str = "en-US",
+        system_override: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         Chat with AI assistant
@@ -178,7 +179,7 @@ When generating code:
         
         system_message = {
             "role": "system",
-            "content": f"""You are a helpful AI coding assistant. {lang_instruction} Help users with:
+            "content": system_override or f"""You are a helpful AI coding assistant. {lang_instruction} Help users with:
 1. Code generation and debugging
 2. Architecture and design questions
 3. Best practices and optimization
