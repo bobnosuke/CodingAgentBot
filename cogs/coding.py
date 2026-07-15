@@ -207,7 +207,7 @@ class CodingCog(commands.Cog):
                 full_response = ""
                 chunk_counter = 0
                 
-                async for chunk in ai_service.chat(message.content, formatted_history):
+                async for chunk in ai_service.chat(message.content, formatted_history, language=lang):
                     full_response += chunk
                     chunk_counter += 1
                     if chunk_counter % 15 == 0:

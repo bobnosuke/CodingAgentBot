@@ -164,23 +164,17 @@ class AIService:
         self,
         user_prompt: str,
         conversation_history: List[Dict[str, str]] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        language: str = "en-US"
     ) -> AsyncGenerator[str, None]:
         """
         Generate code based on user prompt
-        
-        Args:
-            user_prompt: User's code generation request
-            conversation_history: Previous messages in conversation
-            model: Model to use (overrides self.current_model)
-        
-        Yields:
-            Code chunks as they're generated
         """
-        # Build system message for code generation
+        lang_instruction = "Respond in Japanese." if language == "ja" else "Respond in English."
+        
         system_message = {
             "role": "system",
-            "content": """You are an expert AI code generation assistant. Your role is to:
+            "content": f"""You are an expert AI code generation assistant. {lang_instruction} Your role is to:
 1. Generate clean, well-structured, production-ready code
 2. Follow best practices and design patterns
 3. Include comments and documentation
@@ -194,9 +188,7 @@ When generating code:
 - Optimize for readability and maintainability"""
         }
         
-        # Build messages list
         messages = [system_message]
-        
         if conversation_history:
             messages.extend(conversation_history)
         
@@ -205,7 +197,6 @@ When generating code:
             "content": user_prompt
         })
         
-        # Stream response
         async for chunk in self.client.create_message(
             messages=messages,
             model=model or self.current_model,
@@ -219,22 +210,17 @@ When generating code:
         self,
         user_message: str,
         conversation_history: List[Dict[str, str]] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        language: str = "en-US"
     ) -> AsyncGenerator[str, None]:
         """
         Chat with AI assistant
-        
-        Args:
-            user_message: User's message
-            conversation_history: Previous messages
-            model: Model to use (overrides self.current_model)
-        
-        Yields:
-            Response chunks
         """
+        lang_instruction = "Respond in Japanese." if language == "ja" else "Respond in English."
+        
         system_message = {
             "role": "system",
-            "content": """You are a helpful AI coding assistant. Help users with:
+            "content": f"""You are a helpful AI coding assistant. {lang_instruction} Help users with:
 1. Code generation and debugging
 2. Architecture and design questions
 3. Best practices and optimization
@@ -245,7 +231,6 @@ Be concise, clear, and practical in your responses."""
         }
         
         messages = [system_message]
-        
         if conversation_history:
             messages.extend(conversation_history)
         
