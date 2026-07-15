@@ -1,7 +1,7 @@
-"""
-Coding commands for CoderAgent
-Handles /coding start, /coding chat, /coding end commands
-"""
+    """
+    Coding commands for CoderAgent
+    Handles /coding start, /coding end commands and AI chat in CodingRooms
+    """
 import discord
 from discord.ext import commands
 from discord import app_commands
@@ -113,7 +113,7 @@ class CodingCog(commands.Cog):
                 embed.add_field(
                     name="Next Steps",
                     value="1. Go to your coding room\n"
-                          "2. Use `/coding chat` to start coding with AI\n"
+                          "2. Just type your message to chat with AI\n"
                           "3. Use `/coding end` when done",
                     inline=False
                 )
@@ -129,10 +129,10 @@ class CodingCog(commands.Cog):
                 )
                 welcome_embed.add_field(
                     name="Examples",
-                    value="• `/coding chat Create a Discord bot`\n"
-                          "• `/coding chat Add login functionality`\n"
-                          "• `/coding chat Fix this code: ...`\n"
-                          "• `/coding chat Explain how decorators work`",
+                    value="• `Create a Discord bot`\n"
+                          "• `Add login functionality`\n"
+                          "• `Fix this code: ...`\n"
+                          "• `Explain how decorators work`",
                     inline=False
                 )
                 welcome_embed.add_field(
@@ -157,92 +157,79 @@ class CodingCog(commands.Cog):
                 ephemeral=True
             )
     
-    @coding_group.command(name="chat", description="Chat with AI in your coding session")
-    async def coding_chat(self, interaction: discord.Interaction, message: str):
-        """
-        Chat with AI in coding session
-        
-        Args:
-            interaction: Discord interaction
-            message: User's message
-        """
-        try:
-            user_id = str(interaction.user.id)
-            
-            # Check if user has active session
-            session_uuid = self.session_manager.get_user_active_session(user_id)
-            
-            if not session_uuid:
-                await interaction.response.send_message(
-                    "❌ You don't have an active coding session. Use `/coding start` first.",
-                    ephemeral=True
-                )
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        # Ignore messages from bots
+        if message.author.bot:
+            return
+
+        user_id = str(message.author.id)
+        session_uuid = self.session_manager.get_user_active_session(user_id)
+
+        # Check if message is in an active CodingRoom and from the session owner
+        if session_uuid and str(message.channel.id) == self.session_manager.get_session(session_uuid)["channel_id"]:
+            # Ignore messages that start with the bot's prefix (commands)
+            if message.content.startswith(self.bot.command_prefix):
                 return
-            
-            # Check if this command is being used in the correct CodingRoom
-            session_info = self.session_manager.get_session(session_uuid)
-            
-            if session_info and str(interaction.channel.id) != session_info["channel_id"]:
-                await interaction.response.send_message(
-                    "❌ This command can only be used in your coding room!",
-                    ephemeral=True
-                )
-                return
-            
+
             # Check if AI service is initialized
             if user_id not in self.ai_services:
-                await interaction.response.send_message(
-                    "❌ AI service not initialized. Please try starting a new session.",
-                    ephemeral=True
+                await message.channel.send(
+                    "❌ AI service not initialized. Please try starting a new session."
                 )
                 return
-            
-            # Defer response
-            await interaction.response.defer()
-            
+
             # Get AI service
             ai_service = self.ai_services[user_id]
-            
+
             # Send thinking message
-            thinking_msg = await interaction.followup.send("🤔 Thinking...")
-            
+            thinking_msg = await message.channel.send("🤔 Thinking...")
+
             try:
-                # Generate response
                 full_response = ""
-                
-                async for chunk in ai_service.chat(message):
+                async for chunk in ai_service.chat(message.content):
                     full_response += chunk
-                    
-                    # Update message every 50 characters or at the end
+
                     if len(full_response) % 50 == 0 or len(full_response) > 1900:
                         try:
                             await thinking_msg.edit(content=full_response[:2000])
                         except discord.errors.HTTPException:
-                            pass  # Message too long or other error
-                
-                # Final update
+                            pass
+
                 if full_response:
-                    # Split into chunks if too long
                     if len(full_response) > 2000:
                         chunks = [full_response[i:i+2000] for i in range(0, len(full_response), 2000)]
-                        
                         await thinking_msg.edit(content=chunks[0])
-                        
                         for chunk in chunks[1:]:
-                            await interaction.followup.send(chunk)
+                            await message.channel.send(chunk)
                     else:
                         await thinking_msg.edit(content=full_response)
                 else:
                     await thinking_msg.edit(content="❌ No response generated")
-            
+
             except Exception as e:
-                logger.error(f"Error generating response: {e}")
+                logger.error(f"Error generating response in on_message: {e}", exc_info=True)
                 await thinking_msg.edit(content=f"❌ Error: {str(e)}")
-        
-        except Exception as e:
-            logger.error(f"Error in coding_chat: {e}", exc_info=True)
-            await interaction.response.send_message(f"❌ Error: {str(e)}", ephemeral=True)
-    
+
+            # Log message for usage tracking
+            db_session = self.bot.db_manager.get_session()
+            try:
+                await MessageRepository.create_message(
+                    db_session,
+                    session_uuid,
+                    user_id,
+                    message.content,
+                    full_response,
+                    ai_service.current_model,
+                    ai_service.last_input_tokens,
+                    ai_service.last_output_tokens
+                )
+            finally:
+                await db_session.close()
+
+        await self.bot.process_commands(message)
+
     @coding_group.command(name="end", description="End your current coding session")
     async def coding_end(self, interaction: discord.Interaction):
         """
@@ -309,3 +296,5 @@ async def setup(bot: commands.Bot):
     # Add command group to app commands tree
     if cog.coding_group not in bot.tree.get_commands():
         bot.tree.add_command(cog.coding_group)
+    
+
