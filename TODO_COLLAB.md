@@ -1,23 +1,34 @@
-# 🤝 CoderAgent 共同作業タスクリスト
+## 共同作業タスクリスト
 
-このファイルは、CoderAgent プロジェクトにおける共同作業のタスク管理に使用します。
+### Manus-Alpha (担当: Manus-Alpha)
+- [x] **タスクID 1**: `/setting` コマンドの実装（Embed + Select Menu + Modal）
+- [ ] **タスクID 2**: `/coding` サブコマンドの拡充（panel, list, info, export, rename, delete）
+- [x] **タスクID 3**: CodingRoom 内の自動応答実装と `/coding chat` の削除
+- [x] **タスクID 4**: エラーハンドリングの強化（共通エラーハンドラ、Embed 通知）
+- [x] **タスクID 5**: DBリポジトリのテストコード作成
+- [x] **タスクID 6**: 本番環境対応（Docker化）
+- [x] **タスクID 7**: 管理者・オーナー用コマンドの刷新 (/health, /stats, /shutdown)
+- [x] **タスクID 8**: ドキュメントの最新化（README.md, COMMANDS.md）
 
-## 📝 コミュニケーションルール
-- 各エージェントは独自の名前（例: Manus-Alpha, Manus-Beta）でコミュニケーションログに記載すること。
-- 作業開始前には必ず `git pull origin main` で最新のコードを取得し、`TODO_COLLAB.md` と `COMMUNICATION.md` を確認すること。
-- 自身の担当タスクのステータスを更新すること。
-- `COMMUNICATION.md` が長大になることを避けるため、自身の記述が一定量に達したら、その部分を削除して新しい記述を開始すること。
-- 要件定義書は `docs/` フォルダに格納されており、常に最新版を参照すること。
+### Manus-Beta (担当: Manus-Beta)
+- [ ] **タスクID 9**: `/coding` サブコマンドの拡充（panel, list, info, export, rename, delete）
+- [ ] **タスクID 10**: `/setting` コマンドの利用制限実装（要件定義書 31.1）
+- [ ] **タスクID 11**: `/coding start` 時のモデルプリセット反映
+- [ ] **タスクID 12**: `/coding panel` の実装
+- [ ] **タスクID 13**: `/coding server` の実装
 
-## 📋 タスクリスト (最新コマンド仕様に基づく)
+### 共通タスク
+- [ ] **タスクID 14**: 全体的なコードレビューとリファクタリング
+- [ ] **タスクID 15**: パフォーマンス最適化
+- [ ] **タスクID 16**: セキュリティ強化（詳細な権限チェックなど）
+- [ ] **タスクID 17**: テストコードの拡充
 
-| タスクID | 内容 | 担当 | ステータス | 備考 |
-|:---|:---|:---|:---|:---|
-| 1 | `/coding` コマンドの刷新 (panel, server) | Manus-Beta | ⬜ 未着手 | `panel` は開発開始、プロジェクト一覧、詳細確認、プロジェクト名変更を統合。`server` は利用状況表示。 | 
-| 2 | `/setting` コマンドの刷新 (Embed + Select Menu + Modal) | Manus-Alpha | ✅ 完了 | `/setting` は設定表示パネル、`!setting` は直接設定パネルを表示。APIキー登録/削除、モデル選択、利用状況確認を統合。 | 
-| 3 | `/guide` コマンドのページ送り機能実装 | Manus-Beta | ⬜ 未着手 | Embed パネルでページ送りボタンを実装。 | 
-| 4 | CodingRoom 内の自動応答実装と `/coding chat` の削除 | Manus-Alpha | ✅ 完了 | `!` 以外のユーザー発言を AI との会話と認識。`/coding chat` を削除。 | 
-| 5 | CodingRoom 内コマンド (!list, !get, !download, !close, !readme) の実装と修正 | Manus-Beta | ⬜ 未着手 | `!list` は階層表示、`!get` は Select Menu、`!download` は複数選択と「全てダウンロード」ボタン、`!close` は確認ボタン、`!readme` はプロジェクト README 表示。 | 
-| 6 | `/config` コマンドの刷新 (Embed パネル) | Manus-Beta | ⬜ 未着手 | カテゴリ、同時チャンネル数、利用人数制限を設定可能。 | 
-| 7 | 管理者・オーナー用コマンドの刷新 (/health, /stats, /shutdown) | Manus-Alpha | ⬜ 未着手 | `/health` は Embed パネル、`/stats` はグラフ表示、`/shutdown` は安全停止。 | 
-| 8 | 最終動作確認と GitHub への最終同期 | 全員 | ⬜ 未着手 | プロジェクト全体の最終確認。 | 
+---
+
+### 共同作業ルール
+- **独自の名前**: 各エージェントは独自の名前（例: Manus-Alpha, Manus-Beta）を使用し、`COMMUNICATION.md` でやり取りを行います。
+- **`COMMUNICATION.md` の利用**: 他のエージェントへの依頼、進捗報告、質問などは `COMMUNICATION.md` に記載します。自分の発言が長くなったら、適宜削除して新しく書き始めてください。
+- **GitHub を正とする**: 作業開始前に `git pull origin main` で最新のコードを取得し、作業終了後は `git push origin main` で変更を共有します。
+- **変更内容の明記**: `git commit -m "feat: /admin stats コマンドでDBから統計情報を取得` のように、変更の意図がわかるように記述します。
+- **プルリクエスト**: `main` ブランチへのプルリクエストを作成し、レビューを依頼します。
+- **タスク更新**: 自身の担当タスクのステータスを `TODO_COLLAB.md` 内で更新し、完了したタスクは `✅` に変更します。
