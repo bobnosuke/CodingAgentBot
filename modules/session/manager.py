@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from logger import setup_logger
-from ..database.repository import SessionRepository, UserRepository
+from ..database.repository import SessionRepository, UserRepository, GuildRepository
 
 logger = setup_logger(__name__)
 
@@ -59,6 +59,7 @@ class SessionManager:
             
             # Create CodingRoom channel
             coding_room = await self._create_coding_room(
+                db_session,
                 guild,
                 discord_user,
                 project_name or f"Session-{session_uuid[:8]}"
@@ -93,6 +94,7 @@ class SessionManager:
     
     async def _create_coding_room(
         self,
+        db_session: AsyncSession,
         guild: discord.Guild,
         user: discord.User,
         room_name: str
@@ -124,17 +126,22 @@ class SessionManager:
                 )
             }
             
-            # Create category for organization
-            category_name = "🤖-coding-sessions"
-            category = None
+            # Get guild config
+            db_guild = await GuildRepository.get_or_create_guild(db_session, str(guild.id), str(guild.owner_id))
             
-            for cat in guild.categories:
-                if cat.name == category_name:
-                    category = cat
-                    break
+            category = None
+            if db_guild.coding_category_id:
+                category = guild.get_channel(int(db_guild.coding_category_id))
             
             if not category:
-                category = await guild.create_category(category_name)
+                # Fallback to default category
+                category_name = "🤖-coding-sessions"
+                for cat in guild.categories:
+                    if cat.name == category_name:
+                        category = cat
+                        break
+                if not category:
+                    category = await guild.create_category(category_name)
             
             # Create channel in category
             channel = await guild.create_text_channel(
