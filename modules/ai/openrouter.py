@@ -5,10 +5,39 @@ Handles AI model communication and code generation
 import asyncio
 import aiohttp
 from typing import AsyncGenerator, Optional, List, Dict
+import google.generativeai as genai
 from logger import setup_logger
 from config import Config
 
 logger = setup_logger(__name__)
+
+
+class GeminiClient:
+    """Client for Gemini API communication"""
+
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        genai.configure(api_key=self.api_key)
+
+    async def generate_content(
+        self,
+        messages: List[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int = 2000
+    ):
+        model = genai.GenerativeModel("gemini-pro")
+        try:
+            response = await model.generate_content_async(
+                messages,
+                generation_config={
+                    "temperature": temperature,
+                    "max_output_tokens": max_tokens
+                }
+            )
+            yield response.text
+        except Exception as e:
+            logger.error(f"Error calling Gemini API: {e}")
+            raise
 
 
 class OpenRouterClient:
@@ -96,11 +125,12 @@ class OpenRouterClient:
 class AIService:
     """High-level AI service for CoderAgent"""
     
-    def __init__(self, openrouter_client: OpenRouterClient):
+    def __init__(self, openrouter_client: OpenRouterClient, gemini_client: Optional[GeminiClient] = None):
         """
         Initialize AI service
         """
-        self.client = openrouter_client
+        self.openrouter_client = openrouter_client
+        self.gemini_client = gemini_client
         self.current_model = "meta-llama/llama-3.3-70b-instruct:free"
     
     def set_model_by_preset(self, preset: str):
@@ -123,7 +153,8 @@ class AIService:
         user_prompt: str,
         conversation_history: List[Dict[str, str]] = None,
         model: Optional[str] = None,
-        language: str = "en-US"
+        language: str = "en-US",
+        use_gemini: bool = False
     ) -> AsyncGenerator[str, None]:
         """
         Generate code based on user prompt
@@ -155,7 +186,15 @@ When generating code:
             "content": user_prompt
         })
         
-        async for chunk in self.client.create_message(
+        if use_gemini and self.gemini_client:
+            async for chunk in self.gemini_client.generate_content(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2000
+            ):
+                yield chunk
+        else:
+            async for chunk in self.openrouter_client.create_message(
             messages=messages,
             model=model or self.current_model,
             temperature=0.7,
@@ -170,7 +209,8 @@ When generating code:
         conversation_history: List[Dict[str, str]] = None,
         model: Optional[str] = None,
         language: str = "en-US",
-        system_override: Optional[str] = None
+        system_override: Optional[str] = None,
+        use_gemini: bool = False
     ) -> AsyncGenerator[str, None]:
         """
         Chat with AI assistant
@@ -198,7 +238,15 @@ Be concise, clear, and practical in your responses."""
             "content": user_message
         })
         
-        async for chunk in self.client.create_message(
+        if use_gemini and self.gemini_client:
+            async for chunk in self.gemini_client.generate_content(
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2000
+            ):
+                yield chunk
+        else:
+            async for chunk in self.openrouter_client.create_message(
             messages=messages,
             model=model or self.current_model,
             temperature=0.7,

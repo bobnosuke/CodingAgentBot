@@ -35,7 +35,8 @@ class CodingAgent:
                 user_message=user_request,
                 conversation_history=history,
                 system_override=GEMINI_REQUIREMENT_PROMPT,
-                language="ja"
+                language="ja",
+                use_gemini=True
             ):
                 response_text += chunk
             

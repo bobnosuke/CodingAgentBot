@@ -2,12 +2,14 @@
 Database models for CoderAgent
 Defines all database tables and relationships
 """
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Float, ForeignKey, JSON
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, declarative_base
 
 Base = declarative_base()
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 
 class User(Base):
@@ -31,8 +33,8 @@ class User(Base):
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     def __repr__(self):
         return f"<User {self.discord_user_id}: {self.discord_username}>"
@@ -57,8 +59,8 @@ class APIKey(Base):
     user = relationship("User", back_populates="api_keys")
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     def __repr__(self):
         return f"<APIKey {self.id} for User {self.user_id}>"
@@ -89,8 +91,8 @@ class Session(Base):
     projects = relationship("Project", back_populates="session", cascade="all, delete-orphan")
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     def __repr__(self):
         return f"<Session {self.session_uuid} for User {self.user_id}>"
@@ -115,7 +117,7 @@ class Message(Base):
     session = relationship("Session", back_populates="messages")
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     def __repr__(self):
         return f"<Message {self.id} in Session {self.session_id}>"
@@ -140,8 +142,8 @@ class Project(Base):
     session = relationship("Session", back_populates="projects")
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     def __repr__(self):
         return f"<Project {self.project_name} in Session {self.session_id}>"
@@ -164,7 +166,7 @@ class UsageLog(Base):
     user = relationship("User", back_populates="usage_logs")
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     def __repr__(self):
         return f"<UsageLog {self.id} for User {self.user_id}>"
@@ -186,7 +188,7 @@ class SystemLog(Base):
     guild_id = Column(String(50), nullable=True)
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
     
     def __repr__(self):
         return f"<SystemLog {self.event_type} at {self.created_at}>"

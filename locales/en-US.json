@@ -84,7 +84,18 @@
         "END_CONFIRM_TITLE": "⚠️ End Session Confirmation",
         "END_CONFIRM_DESC": "Are you sure you want to end this session?\nThe channel will be deleted.",
         "END_SUCCESS": "✅ Session ended.",
-        "END_CANCEL": "Session termination cancelled."
+        "END_CANCEL": "Session termination cancelled.",
+        "REQUIREMENT_TITLE": "📝 Requirement Definition (Gemini)",
+        "REQUIREMENT_SUMMARY": "Task Summary",
+        "REQUIREMENT_TECH": "Technical Requirements",
+        "REQUIREMENT_PLAN": "Implementation Plan",
+        "REQUIREMENT_READY": "✅ Requirements are ready. Start implementation?",
+        "REQUIREMENT_NOT_READY": "ℹ️ More details are needed. Please provide additional information.",
+        "APPROVE_BUTTON": "Start Implementation",
+        "REFINE_BUTTON": "Refine Requirements",
+        "IMPLEMENTING": "🚀 Starting implementation. Please wait...",
+        "IMPLEMENTATION_SUCCESS": "✅ Implementation completed!",
+        "IMPLEMENTATION_ERROR": "❌ Error during implementation: {error}"
     },
     "FILE": {
         "DOWNLOAD_TITLE": "📦 File Download",

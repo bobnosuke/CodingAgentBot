@@ -43,6 +43,9 @@ class Config:
     MAX_FILE_SIZE_MB = 25  # Discord's file size limit
     MAX_FILES_PER_SESSION = 50
     
+    # Gemini API
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+
     # AI Configuration
     DEFAULT_AI_MODEL = "openrouter/auto"
     AI_TIMEOUT_SECONDS = 120
