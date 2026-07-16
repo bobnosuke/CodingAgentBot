@@ -26,17 +26,42 @@ class GeminiClient:
         max_tokens: int = 2000
     ):
         try:
+            contents = []
+            system_instruction = None
+            for message in messages:
+                if message["role"] == "system":
+                    system_instruction = message["content"]
+                elif message["role"] == "user":
+                    contents.append({
+                        "role": "user",
+                        "parts": [
+                            {
+                                "text": message["content"]
+                            }
+                        ]
+                    })
+                elif message["role"] == "assistant":
+                    contents.append({
+                        "role": "model",
+                        "parts": [
+                            {
+                                "text": message["content"]
+                            }
+                        ]
+                    })
             response = await self.client.aio.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=messages,
+                model="gemini-2.5-flash-lite",
+                contents=contents,
                 config=types.GenerateContentConfig(
                     temperature=temperature,
-                    max_output_tokens=max_tokens
+                    max_output_tokens=max_tokens,
+                    system_instruction=system_instruction
                 )
             )
-
-            yield response.text
-
+            if response.text:
+                yield response.text
+            else:
+                yield "Geminiから応答がありませんでした。"
         except Exception as e:
             logger.error(f"Error calling Gemini API: {e}")
             raise
