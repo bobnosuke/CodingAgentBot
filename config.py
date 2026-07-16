@@ -54,12 +54,12 @@ class Config:
         missing = [key for key in required if not getattr(cls, key)]
         
         if missing:
-            print(f"❌ Missing required configuration: {', '.join(missing)}")
+            print(f"❌ 必須の設定が不足しています: {", ".join(missing)}")
             return False
         
         # Create necessary directories
         cls.STORAGE_DIR.mkdir(exist_ok=True)
         cls.LOGS_DIR.mkdir(exist_ok=True)
         
-        print("✅ Configuration validated successfully")
+        print("✅ 設定が正常に検証されました")
         return True
