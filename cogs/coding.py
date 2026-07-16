@@ -253,7 +253,7 @@ class CodingCog(commands.Cog):
 
     @coding_group.command(
         name="panel", 
-        description="Show coding management panel"
+        description="開発マネジメントパネルを表示します"
     )
     async def coding_panel(self, interaction: discord.Interaction):
         """Show Public Panel"""
@@ -287,7 +287,7 @@ class CodingCog(commands.Cog):
     
     @coding_group.command(
         name="start", 
-        description="Start a new coding session"
+        description="開発を開始します"
     )
     async def coding_start(self, interaction: discord.Interaction, project_name: str = None):
         """Start Session (New Ephemeral)"""
@@ -335,7 +335,7 @@ class CodingCog(commands.Cog):
 
     @coding_group.command(
         name="end", 
-        description="End current coding session"
+        description="Codingセッションを削除します"
     )
     async def coding_end(self, interaction: discord.Interaction):
         """End Session (New Ephemeral Confirmation)"""
