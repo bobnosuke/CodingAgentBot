@@ -195,13 +195,13 @@ When generating code:
                 yield chunk
         else:
             async for chunk in self.openrouter_client.create_message(
-            messages=messages,
-            model=model or self.current_model,
-            temperature=0.7,
-            max_tokens=4000,
-            stream=True
-        ):
-            yield chunk
+            　　　messages=messages,
+            　　　model=model or self.current_model,
+            　　　temperature=0.7,
+            　　　max_tokens=4000,
+            　　　stream=True
+        　　　):
+            　　　yield chunk
     
     async def chat(
         self,
