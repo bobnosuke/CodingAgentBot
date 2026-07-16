@@ -3,10 +3,16 @@ version: '3.8'
 services:
   bot:
     build: .
-    container_name: coderagent-bot
     restart: always
-    env_file:
-      - .env
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      BOT_PREFIX: ${BOT_PREFIX}
+      OWNER_ID: ${OWNER_ID}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      DATABASE_URL: ${DATABASE_URL}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      LOG_LEVEL: ${LOG_LEVEL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
     volumes:
       - ./storage:/app/storage
       - ./logs:/app/logs
