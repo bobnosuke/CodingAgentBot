@@ -278,7 +278,7 @@ class SettingCog(commands.Cog):
     
     @app_commands.command(
         name="setting", 
-        description="Configure bot settings"
+        description="設定用パネルを表示します"
     )
     async def setting(self, interaction: discord.Interaction):
         """Show User Settings Panel (Public Start Button)"""
