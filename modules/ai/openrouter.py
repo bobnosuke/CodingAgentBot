@@ -5,7 +5,8 @@ Handles AI model communication and code generation
 import asyncio
 import aiohttp
 from typing import AsyncGenerator, Optional, List, Dict
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from logger import setup_logger
 from config import Config
 
@@ -16,8 +17,7 @@ class GeminiClient:
     """Client for Gemini API communication"""
 
     def __init__(self, api_key: str):
-        self.api_key = api_key
-        genai.configure(api_key=self.api_key)
+        self.client = genai.Client(api_key=api_key)
 
     async def generate_content(
         self,
@@ -25,20 +25,21 @@ class GeminiClient:
         temperature: float = 0.7,
         max_tokens: int = 2000
     ):
-        model = genai.GenerativeModel("gemini-pro")
         try:
-            response = await model.generate_content_async(
-                messages,
-                generation_config={
-                    "temperature": temperature,
-                    "max_output_tokens": max_tokens
-                }
+            response = await self.client.aio.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=messages,
+                config=types.GenerateContentConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens
+                )
             )
+
             yield response.text
+
         except Exception as e:
             logger.error(f"Error calling Gemini API: {e}")
             raise
-
 
 class OpenRouterClient:
     """Client for OpenRouter API communication"""
