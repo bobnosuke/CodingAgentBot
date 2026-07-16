@@ -20,10 +20,30 @@ class RequirementApprovalView(discord.ui.View):
             return await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
             
         await interaction.response.defer()
-        await interaction.edit_original_response(content=i18n.translate(self.lang, "CODING.IMPLEMENTING"), view=None)
+        
+        # Progress notification callback
+        async def update_progress(msg, status):
+            emoji = "⚙️"
+            if status == "setup": emoji = "🏗️"
+            elif status == "generating": emoji = "🧠"
+            elif status == "verifying": emoji = "🧪"
+            elif status == "retrying": emoji = "🩹"
+            elif status == "success": emoji = "✨"
+            elif status == "error": emoji = "❌"
+            
+            embed = discord.Embed(
+                title="🚀 自律実装プロセス",
+                description=f"{emoji} **{msg}**",
+                color=discord.Color.blue()
+            )
+            await interaction.edit_original_response(content=None, embed=embed, view=None)
+
+        self.agent.on_progress = update_progress
         
         # Phase 2: Implementation
-        result = await self.agent.execute_task(self.requirement_json)
+        # We need a session_id here, using a dummy for now or extracting from interaction
+        session_id = f"session_{interaction.channel_id}"
+        result = await self.agent.execute_task(self.requirement_json, session_id=session_id)
         
         from modules.utils.i18n import i18n
         if "error" in result:
