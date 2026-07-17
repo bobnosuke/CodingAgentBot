@@ -25,12 +25,18 @@ class CodingAgent:
         self.max_retries = 3
         self.on_progress = on_progress
 
-    async def _notify_progress(self, message: str, status: str = "processing"):
+    async def _notify_progress(self, message, status):
+        print("_notify_progress開始")
+    
         if self.on_progress:
+            print("callbackあり")
+    
             if asyncio.iscoroutinefunction(self.on_progress):
+                print("callback await前")
+    
                 await self.on_progress(message, status)
-            else:
-                self.on_progress(message, status)
+    
+                print("callback await後")
 
     async def define_requirements(self, user_request: str, history: list = []) -> dict:
         """
