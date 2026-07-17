@@ -11,10 +11,12 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       LOG_LEVEL: ${LOG_LEVEL}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+
     volumes:
       - ./storage:/app/storage
       - ./logs:/app/logs
-      - coderagent_data:/app/coderagent.db
+      - coderagent_data:/app/data
+
     logging:
       driver: "json-file"
       options:
