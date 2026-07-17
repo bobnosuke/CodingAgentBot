@@ -108,7 +108,7 @@ class CodingAgent:
             
             response_text = ""
             try:
-                async for chunk in self.ai_service.generate_code(
+                async for chunk in self.ai_service.chat(
                     user_message=user_msg,
                     conversation_history=history,
                     system_override=system_prompt,
