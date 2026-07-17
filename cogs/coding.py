@@ -250,7 +250,7 @@ class CodingCog(commands.Cog):
                 
                 if requirement_json.get("is_ready"):
                     embed.description = i18n.translate(lang, "CODING.REQUIREMENT_READY")
-                    view = RequirementApprovalView(agent, db_session, requirement.id, str(message.author.id), lang)
+                    view = RequirementApprovalView(agent, requirement.id, str(message.author.id), lang)
                     await response_msg.edit(content=None, embed=embed, view=view)
                 else:
                     embed.description = i18n.translate(lang, "CODING.REQUIREMENT_NOT_READY")
