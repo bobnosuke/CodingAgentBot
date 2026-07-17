@@ -15,55 +15,59 @@ logger = setup_logger(__name__)
 
 class GeminiClient:
     """Client for Gemini API communication"""
-
     def __init__(self, api_key: str):
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(
+                api_version="v1"
+            )
+        )
 
     async def generate_content(
         self,
         messages: List[Dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: int = 2000
+        max_tokens: int = 2000,
     ):
         try:
+            async for model in self.client.aio.models.list():
+                print(model.name)
             contents = []
             system_instruction = None
             for message in messages:
-                if message["role"] == "system":
-                    system_instruction = message["content"]
-                elif message["role"] == "user":
-                    contents.append({
-                        "role": "user",
-                        "parts": [
-                            {
-                                "text": message["content"]
-                            }
-                        ]
-                    })
-                elif message["role"] == "assistant":
-                    contents.append({
-                        "role": "model",
-                        "parts": [
-                            {
-                                "text": message["content"]
-                            }
-                        ]
-                    })
+                role = message["role"]
+                text = message["content"]
+                if role == "system":
+                    system_instruction = text
+                elif role == "user":
+                    contents.append(
+                        types.Content(
+                            role="user",
+                            parts=[types.Part.from_text(text=text)]
+                        )
+                    )
+                elif role == "assistant":
+                    contents.append(
+                        types.Content(
+                            role="model",
+                            parts=[types.Part.from_text(text=text)]
+                        )
+                    )
             response = await self.client.aio.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-flash-latest",
                 contents=contents,
                 config=types.GenerateContentConfig(
                     temperature=temperature,
                     max_output_tokens=max_tokens,
-                    system_instruction=system_instruction
-                )
+                    system_instruction=system_instruction,
+                ),
             )
             if response.text:
                 yield response.text
             else:
                 yield "Geminiから応答がありませんでした。"
         except Exception as e:
-            logger.error(f"Error calling Gemini API: {e}")
+            logger.exception("Error calling Gemini API")
             raise
 
 class OpenRouterClient:
