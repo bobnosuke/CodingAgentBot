@@ -23,10 +23,7 @@ class RequirementApprovalView(discord.ui.View):
         
     @discord.ui.button(label="Start Implementation", style=discord.ButtonStyle.green, emoji="🚀")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
-        logger.info(
-            f"Start Implementation clicked by {interaction.user} "
-            f"(requirement_id={self.requirement_id})"
-        )
+        print("approve called")
         from modules.utils.i18n import i18n
         if str(interaction.user.id) != self.user_id:
             return await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
