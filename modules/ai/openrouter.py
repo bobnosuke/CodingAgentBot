@@ -5,75 +5,36 @@ Handles AI model communication and code generation
 import asyncio
 import aiohttp
 from typing import AsyncGenerator, Optional, List, Dict
-from google import genai
-from google.genai import types
+from openai import AsyncOpenAI
 from logger import setup_logger
 from config import Config
 
 logger = setup_logger(__name__)
 
 
-class GeminiClient:
-    """Client for Gemini API communication"""
-
+class CerebrasClient:
     def __init__(self, api_key: str):
-        self.client = genai.Client(api_key=api_key)
-
+        self.client = AsyncOpenAI(
+            api_key=api_key,
+            base_url="https://api.cerebras.ai/v1"
+        )
     async def generate_content(
         self,
-        messages: List[Dict[str, str]],
-        temperature: float = 0.7,
-        max_tokens: int = 2000,
+        messages,
+        temperature=0.7,
+        max_tokens=2000
     ):
-        try:
-            contents: List[types.Content] = []
-            system_instruction = None
-
-            for message in messages:
-                role = message["role"]
-                text = message["content"]
-
-                if role == "system":
-                    system_instruction = text
-
-                elif role == "user":
-                    contents.append(
-                        types.Content(
-                            role="user",
-                            parts=[
-                                types.Part.from_text(text=text)
-                            ],
-                        )
-                    )
-
-                elif role == "assistant":
-                    contents.append(
-                        types.Content(
-                            role="model",
-                            parts=[
-                                types.Part.from_text(text=text)
-                            ],
-                        )
-                    )
-
-            response = await self.client.aio.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                    temperature=temperature,
-                    max_output_tokens=max_tokens,
-                ),
-            )
-
-            if response.text:
-                yield response.text
-            else:
-                yield "Geminiから応答がありませんでした。"
-
-        except Exception:
-            logger.exception("Error calling Gemini API")
-            raise
+        response = await self.client.chat.completions.create(
+            model="llama3.3-70b",
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            stream=True
+        )
+        async for chunk in response:
+            content = chunk.choices[0].delta.content
+            if content:
+                yield content
 
 class OpenRouterClient:
     """Client for OpenRouter API communication"""
@@ -164,12 +125,12 @@ class OpenRouterClient:
 class AIService:
     """High-level AI service for CoderAgent"""
     
-    def __init__(self, openrouter_client: OpenRouterClient, gemini_client: Optional[GeminiClient] = None):
+    def __init__(self, openrouter_client: OpenRouterClient, gemini_client: Optional[CerebrasClient] = None):
         """
         Initialize AI service
         """
         self.openrouter_client = openrouter_client
-        self.gemini_client = gemini_client
+        self.cerebras_client = gemini_client
         self.current_model = "meta-llama/llama-3.3-70b-instruct:free"
     
     def set_model_by_preset(self, preset: str):
@@ -225,8 +186,8 @@ When generating code:
             "content": user_prompt
         })
         
-        if use_gemini and self.gemini_client:
-            async for chunk in self.gemini_client.generate_content(
+        if use_gemini and self.cerebras_client:
+            async for chunk in self.cerebras_client.generate_content(
                 messages=messages,
                 temperature=0.7,
                 max_tokens=2000
@@ -277,8 +238,8 @@ Be concise, clear, and practical in your responses."""
             "content": user_message
         })
         
-        if use_gemini and self.gemini_client:
-            async for chunk in self.gemini_client.generate_content(
+        if use_gemini and self.cerebras_client:
+            async for chunk in self.cerebras_client.generate_content(
                 messages=messages,
                 temperature=0.7,
                 max_tokens=2000
