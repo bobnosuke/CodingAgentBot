@@ -66,7 +66,9 @@ class CodingAgent:
         """
         Phase 2: Execute implementation with self-correction loop.
         """
+        print("execute_task開始")
         await self._notify_progress("環境のセットアップを開始します...", "setup")
+        print("notify_progress完了")
         system_prompt = """あなたはエキスパート自律コーディングエージェントです。
 提供された技術仕様（JSON）に基づき、完動するコードを実装してください。
 
@@ -96,6 +98,7 @@ class CodingAgent:
         # Build image once for this session
         try:
             await self.executor.build_image(session_id)
+            print("docker build完了")
             await self._notify_progress("実行環境の準備が完了しました。", "setup_complete")
         except Exception as e:
             logger.error(f"Failed to build Docker image: {e}")
@@ -161,6 +164,7 @@ class CodingAgent:
 3. ロジックに矛盾がないか
 
 再度、全ファイルのコードをJSON形式で出力してください。"""
+                print("AI呼び出し終了")
                     
             except Exception as e:
                 logger.error(f"Error in execute_task attempt {attempt + 1}: {e}")
