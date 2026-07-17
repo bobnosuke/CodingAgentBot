@@ -178,7 +178,7 @@ class CodingPanelView(discord.ui.View):
                 db_session, 
                 interaction.user, 
                 interaction.guild, 
-                channel_name
+                project_name=channel_name
             )
             
             embed = discord.Embed(

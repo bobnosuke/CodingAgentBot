@@ -1,5 +1,5 @@
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from discord import app_commands
 import os
 import asyncio
@@ -59,6 +59,12 @@ class CoderAgent(commands.Bot):
         self.add_view(CodingPanelView(self))
         logger.info("✅ Persistent views registered")
 
+        # Start background tasks
+        self.cleanup_sessions.start()
+        self.cleanup_old_projects_task.start()
+        logger.info("✅ Session cleanup task started")
+        logger.info("✅ Old project cleanup task started")
+
     async def on_ready(self):
         logger.info(f"✅ Bot logged in as {self.user}")
         logger.info(f"Bot ID: {self.user.id}")
@@ -70,6 +76,30 @@ class CoderAgent(commands.Bot):
             logger.info("✅ Commands synced to Discord")
         except Exception as e:
             logger.error(f"❌ Failed to sync commands: {e}")
+
+    @tasks.loop(hours=Config.SESSION_TIMEOUT_HOURS)
+    async def cleanup_sessions(self):
+        """Periodically clean up expired sessions."""
+        from modules.session.manager import SessionManager
+        session_manager = SessionManager(self)
+        await session_manager.cleanup_expired_sessions()
+
+    @cleanup_sessions.before_loop
+    async def before_cleanup_sessions(self):
+        await self.wait_until_ready()
+        logger.info("Session cleanup task waiting for bot to be ready...")
+
+    @tasks.loop(hours=Config.SESSION_CACHE_CLEANUP_DAYS * 24) # Run daily for project cleanup
+    async def cleanup_old_projects_task(self):
+        """Periodically clean up old project files."""
+        from modules.project.manager import ProjectManager
+        project_manager = ProjectManager()
+        await project_manager.cleanup_old_projects()
+
+    @cleanup_old_projects_task.before_loop
+    async def before_cleanup_old_projects_task(self):
+        await self.wait_until_ready()
+        logger.info("Old project cleanup task waiting for bot to be ready...")
 
     async def on_app_command_error(self, interaction: discord.Interaction, error: app_commands.AppCommandError):
         if isinstance(error, app_commands.CommandOnCooldown):

@@ -9,6 +9,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from logger import setup_logger
 from ..database.repository import SessionRepository, UserRepository
+from modules.project.manager import ProjectManager
 
 logger = setup_logger(__name__)
 
@@ -25,6 +26,7 @@ class SessionManager:
         """
         self.bot = bot
         self.active_sessions = {}  # In-memory cache for active sessions
+        self.project_manager = ProjectManager() # Initialize ProjectManager
     
     async def create_session(
         self,
@@ -74,8 +76,17 @@ class SessionManager:
                 session_uuid,
                 user.id,
                 str(guild.id),
-                str(coding_room.id), # Store channel_id in DB
+                str(coding_room.id),
                 project_name or default_name
+            )
+
+            # Create a project for the session
+            from modules.project.manager import ProjectManager
+            project_manager = ProjectManager()
+            await project_manager.create_project(
+                user.id,
+                project_name or default_name,
+                db_session_obj.id
             )
             
             # Cache session
@@ -229,6 +240,47 @@ class SessionManager:
         return self.active_sessions.get(session_uuid)
     
     def get_user_active_session(self, discord_user_id: str) -> Optional[str]:
+        for session_uuid, info in list(self.active_sessions.items()): # Iterate over a copy
+            if info["discord_user_id"] == discord_user_id:
+                return session_uuid
+        
+        return None
+
+    async def cleanup_expired_sessions(self):
+        """Clean up expired sessions and their associated resources."""
+        logger.info("Starting expired session cleanup...")
+        current_time = datetime.utcnow()
+        expired_sessions_to_remove = []
+
+        for session_uuid, session_info in list(self.active_sessions.items()):
+            created_at = session_info.get("created_at")
+            if created_at and (current_time - created_at).total_seconds() / 3600 > Config.SESSION_TIMEOUT_HOURS:
+                logger.info(f"Session {session_uuid} expired. Cleaning up...")
+                db_session = self.bot.db_manager.get_session()
+                try:
+                    # Close session in DB and delete channel
+                    await self.close_session(db_session, session_uuid, delete_channel=True)
+                    expired_sessions_to_remove.append(session_uuid)
+
+                    # Clean up project files associated with the session
+                    user_id = session_info.get("user_id")
+                    if user_id:
+                        project_manager = self.project_manager
+                        project = await project_manager.get_project_by_session_id(user_id, session_info["db_session_id"])
+                        if project:
+                            await project_manager.delete_project(user_id, project["id"])
+                            logger.info(f"Deleted project {project['id']} associated with expired session {session_uuid}")
+
+                except Exception as e:
+                    logger.error(f"Error cleaning up expired session {session_uuid}: {e}", exc_info=True)
+                finally:
+                    await db_session.close()
+        
+        for session_uuid in expired_sessions_to_remove:
+            if session_uuid in self.active_sessions:
+                del self.active_sessions[session_uuid]
+        
+        logger.info("Expired session cleanup finished.")
         """
         Get active session UUID for a user
         
