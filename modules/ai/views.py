@@ -29,8 +29,8 @@ class RequirementApprovalView(discord.ui.View):
         if str(interaction.user.id) != self.user_id:
             return await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
             
-        await interaction.response.defer()
-        print("defer完了")
+        await interaction.response.send_message("コードを生成しています。しばらくお待ちください。")
+        print("メッセージ送信完了")
         
         # Progress notification callback
         async def update_progress(msg, status):
@@ -58,6 +58,7 @@ class RequirementApprovalView(discord.ui.View):
                 db,
                 self.requirement_id
             )
+            print("要件データ取得完了")
         
             if not requirement:
                 return await interaction.followup.send(
@@ -81,6 +82,7 @@ class RequirementApprovalView(discord.ui.View):
                 requirement_json,
                 session_id=session_id
             )
+            print("リザルト取得完了")
         
             if "error" in result:
                 return await interaction.followup.send(
@@ -96,6 +98,7 @@ class RequirementApprovalView(discord.ui.View):
                 self.requirement_id,
                 status="completed"
             )
+            print("要件アップデート完了")
         
         finally:
             await db.close()
