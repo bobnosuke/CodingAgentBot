@@ -183,7 +183,14 @@ class CodingCog(commands.Cog):
         if message.content.startswith(self.bot.command_prefix):
             return
 
+        # Check if session is already processing
+        session_info = self.session_manager.active_sessions[session_uuid]
+        if session_info.get("status") == "processing":
+            return await message.reply("⚠️ 現在別の処理を実行中です。完了までお待ちください。")
+
         async with message.channel.typing():
+            # Set status to processing
+            session_info["status"] = "processing"
             db_session = self.bot.db_manager.get_session()
             try:
                 session_info = self.session_manager.active_sessions[session_uuid]
@@ -211,6 +218,8 @@ class CodingCog(commands.Cog):
                 
                 from modules.ai.agent import CodingAgent
                 from modules.ai.views import RequirementApprovalView
+                from modules.database.repository import RequirementRepository
+                import json
                 
                 agent = CodingAgent(ai_service)
                 response_msg = await message.reply(i18n.translate(lang, "CODING.THINKING"))
@@ -221,6 +230,13 @@ class CodingCog(commands.Cog):
                 if "error" in requirement_json:
                     await response_msg.edit(content=i18n.translate(lang, "COMMON.ERROR", error=requirement_json["error"]))
                     return
+
+                # Store requirement in DB
+                requirement = await RequirementRepository.create_requirement(
+                    db_session, 
+                    session_info["db_session_id"], 
+                    requirement_json
+                )
 
                 # Display Requirements to User
                 embed = discord.Embed(
@@ -234,8 +250,7 @@ class CodingCog(commands.Cog):
                 
                 if requirement_json.get("is_ready"):
                     embed.description = i18n.translate(lang, "CODING.REQUIREMENT_READY")
-                    view = RequirementApprovalView(agent, requirement_json, str(message.author.id), lang)
-                    # Note: In a real bot, we'd need to handle the approval flow properly with session management
+                    view = RequirementApprovalView(agent, db_session, requirement.id, str(message.author.id), lang)
                     await response_msg.edit(content=None, embed=embed, view=view)
                 else:
                     embed.description = i18n.translate(lang, "CODING.REQUIREMENT_NOT_READY")
@@ -249,6 +264,8 @@ class CodingCog(commands.Cog):
                 logger.error(f"Error in AI chat: {e}", exc_info=True)
                 await message.reply(i18n.translate("en-US", "COMMON.ERROR", error=str(e)))
             finally:
+                # Reset status
+                session_info["status"] = "idle"
                 await db_session.close()
 
     @coding_group.command(

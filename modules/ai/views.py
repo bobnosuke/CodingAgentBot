@@ -1,14 +1,16 @@
 import discord
 import json
 from modules.ai.agent import CodingAgent
+from modules.database.repository import RequirementRepository
 
 class RequirementApprovalView(discord.ui.View):
     """View for approving or refining requirements defined by Gemini"""
     
-    def __init__(self, agent: CodingAgent, requirement_json: dict, user_id: str, lang: str):
+    def __init__(self, agent: CodingAgent, db_session, requirement_id: int, user_id: str, lang: str):
         super().__init__(timeout=600)
         self.agent = agent
-        self.requirement_json = requirement_json
+        self.db_session = db_session
+        self.requirement_id = requirement_id
         self.user_id = user_id
         self.lang = lang
         self.refine_count = 0
@@ -40,18 +42,27 @@ class RequirementApprovalView(discord.ui.View):
 
         self.agent.on_progress = update_progress
         
-        # Phase 2: Implementation
-        # We need a session_id here, using a dummy for now or extracting from interaction
-        session_id = f"session_{interaction.channel_id}"
-        result = await self.agent.execute_task(self.requirement_json, session_id=session_id)
+        # Get requirement from DB
+        requirement = await RequirementRepository.get_requirement(self.db_session, self.requirement_id)
+        if not requirement:
+            return await interaction.followup.send("❌ 要件データが見つかりませんでした。最初からやり直してください。", ephemeral=True)
+
+        # Update status to approved
+        await RequirementRepository.approve_requirement(self.db_session, self.requirement_id)
         
-        from modules.utils.i18n import i18n
+        # Phase 2: Implementation
+        # Using a dummy session_id for now as it's required by the new agent implementation
+        session_id = f"session_{interaction.channel_id}"
+        result = await self.agent.execute_task(requirement.json_data, session_id=session_id)
+        
         if "error" in result:
             await interaction.followup.send(i18n.translate(self.lang, "CODING.IMPLEMENTATION_ERROR", error=result['error']))
             return
 
+        # Update status to completed
+        await RequirementRepository.update_requirement(self.db_session, self.requirement_id, status="completed")
+
         # ファイル保存ロジック（実際にはSessionManager等を通じて行う）
-        # ここではシミュレーションとして結果を表示
         embed = discord.Embed(title=i18n.translate(self.lang, "CODING.IMPLEMENTATION_SUCCESS"), color=discord.Color.green())
         embed.add_field(name=i18n.translate(self.lang, "CODING.REQUIREMENT_PLAN"), value="\n".join(result.get("plan", []))[:1024], inline=False)
         embed.add_field(name="Files", value=", ".join([f["path"] for f in result.get("files", [])]), inline=False)
@@ -87,13 +98,23 @@ class RefinementModal(discord.ui.Modal, title="Refine Requirements"):
         await interaction.response.defer()
         self.parent_view.refine_count += 1
         
-        # Geminiに再依頼（履歴を含めるロジックが必要）
+        # Get current requirement from DB
+        current_req = await RequirementRepository.get_requirement(self.parent_view.db_session, self.parent_view.requirement_id)
+        if not current_req:
+            return await interaction.followup.send("❌ 要件データが見つかりませんでした。", ephemeral=True)
+
+        # Geminiに再依頼
         new_req = await self.parent_view.agent.define_requirements(
             self.feedback.value, 
-            history=[{"role": "assistant", "content": json.dumps(self.parent_view.requirement_json, ensure_ascii=False)}]
+            history=[{"role": "assistant", "content": json.dumps(current_req.json_data, ensure_ascii=False)}]
         )
         
-        self.parent_view.requirement_json = new_req
+        # Update requirement in DB
+        await RequirementRepository.update_requirement(
+            self.parent_view.db_session, 
+            self.parent_view.requirement_id, 
+            json_data=new_req
+        )
         
         from modules.utils.i18n import i18n
         # Embedを更新して再提示

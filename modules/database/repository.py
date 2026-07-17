@@ -6,7 +6,7 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from logger import setup_logger
-from .models import User, APIKey, Session, Message, Project, UsageLog, SystemLog
+from .models import User, APIKey, Session, Message, Project, UsageLog, SystemLog, Requirement
 from datetime import datetime, time
 
 logger = setup_logger(__name__)
@@ -409,4 +409,95 @@ class UsageLogRepository:
             return result.scalar() or 0
         except Exception as e:
             logger.error(f"Error in get_daily_usage_count: {e}")
+            raise
+
+
+class RequirementRepository:
+    """Repository for Requirement operations"""
+    
+    @staticmethod
+    async def create_requirement(
+        session: AsyncSession,
+        session_id: int,
+        json_data: dict
+    ) -> Requirement:
+        """Create a new requirement entry"""
+        try:
+            requirement = Requirement(
+                session_id=session_id,
+                json_data=json_data,
+                status="pending"
+            )
+            session.add(requirement)
+            await session.commit()
+            
+            logger.info(f"Created requirement for session {session_id}")
+            return requirement
+        except Exception as e:
+            logger.error(f"Error in create_requirement: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_requirement(session: AsyncSession, requirement_id: int) -> Optional[Requirement]:
+        """Get requirement by ID"""
+        try:
+            return await session.get(Requirement, requirement_id)
+        except Exception as e:
+            logger.error(f"Error in get_requirement: {e}")
+            raise
+
+    @staticmethod
+    async def update_requirement(
+        session: AsyncSession,
+        requirement_id: int,
+        json_data: dict = None,
+        status: str = None
+    ) -> Optional[Requirement]:
+        """Update requirement data or status"""
+        try:
+            requirement = await session.get(Requirement, requirement_id)
+            if requirement:
+                if json_data is not None:
+                    requirement.json_data = json_data
+                if status is not None:
+                    requirement.status = status
+                requirement.updated_at = datetime.utcnow()
+                await session.commit()
+                return requirement
+            return None
+        except Exception as e:
+            logger.error(f"Error in update_requirement: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def delete_requirement(session: AsyncSession, requirement_id: int) -> bool:
+        """Delete a requirement"""
+        try:
+            requirement = await session.get(Requirement, requirement_id)
+            if requirement:
+                await session.delete(requirement)
+                await session.commit()
+                return True
+            return False
+        except Exception as e:
+            logger.error(f"Error in delete_requirement: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def approve_requirement(session: AsyncSession, requirement_id: int) -> Optional[Requirement]:
+        """Set requirement status to approved"""
+        return await RequirementRepository.update_requirement(session, requirement_id, status="approved")
+
+    @staticmethod
+    async def get_latest_requirement_by_session(session: AsyncSession, session_id: int) -> Optional[Requirement]:
+        """Get the latest requirement for a session"""
+        try:
+            stmt = select(Requirement).where(Requirement.session_id == session_id).order_by(Requirement.created_at.desc())
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error in get_latest_requirement_by_session: {e}")
             raise

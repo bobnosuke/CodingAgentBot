@@ -89,6 +89,7 @@ class Session(Base):
     user = relationship("User", back_populates="sessions")
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="session", cascade="all, delete-orphan")
+    requirements = relationship("Requirement", back_populates="session", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime, default=utc_now)
@@ -192,3 +193,25 @@ class SystemLog(Base):
     
     def __repr__(self):
         return f"<SystemLog {self.event_type} at {self.created_at}>"
+
+
+class Requirement(Base):
+    """Requirement model - stores structured requirement JSONs"""
+    __tablename__ = "requirements"
+    
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    
+    # Requirement data
+    json_data = Column(JSON, nullable=False)
+    status = Column(String(50), default="pending")  # "pending", "approved", "completed"
+    
+    # Relationship
+    session = relationship("Session", back_populates="requirements")
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<Requirement {self.id} for Session {self.session_id} (Status: {self.status})>"
