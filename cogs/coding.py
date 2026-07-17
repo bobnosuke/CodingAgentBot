@@ -12,9 +12,95 @@ from modules.ai.openrouter import OpenRouterClient, AIService, CerebrasClient
 from config import Config
 import json
 from modules.utils.i18n import i18n
+from modules.project.manager import ProjectManager
 import asyncio
 
 logger = setup_logger(__name__)
+
+
+class ProjectRenameModal(discord.ui.Modal, title="Rename Project"):
+    project_id_input = discord.ui.TextInput(
+        label="Project ID",
+        placeholder="Enter the Project ID to rename",
+        required=True,
+        style=discord.TextStyle.short
+    )
+    new_name_input = discord.ui.TextInput(
+        label="New Project Name",
+        placeholder="Enter the new name for the project",
+        required=True,
+        style=discord.TextStyle.short
+    )
+
+    def __init__(self, parent_view: 'CodingPanelView', lang: str):
+        super().__init__()
+        self.parent_view = parent_view
+        self.lang = lang
+        self.project_id_input.label = i18n.translate(self.lang, "CODING.MODAL_PROJ_ID_LABEL")
+        self.project_id_input.placeholder = i18n.translate(self.lang, "CODING.MODAL_PROJ_ID_RENAME_PLACEHOLDER")
+        self.new_name_input.label = i18n.translate(self.lang, "CODING.MODAL_NEW_PROJ_NAME_LABEL")
+        self.new_name_input.placeholder = i18n.translate(self.lang, "CODING.MODAL_NEW_PROJ_NAME_PLACEHOLDER")
+        self.title = i18n.translate(self.lang, "CODING.MODAL_PROJ_RENAME_TITLE")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        project_id = self.project_id_input.value.strip()
+        new_name = self.new_name_input.value.strip()
+        user_id = interaction.user.id
+
+        renamed_project = await self.parent_view.project_manager.rename_project(user_id, project_id, new_name)
+
+        if renamed_project:
+            await interaction.followup.send(
+                i18n.translate(self.lang, "CODING.PROJ_RENAMED_SUCCESS", project_id=project_id, new_name=new_name),
+                ephemeral=True
+            )
+        else:
+            await interaction.followup.send(
+                i18n.translate(self.lang, "CODING.PROJ_RENAME_FAILED", project_id=project_id),
+                ephemeral=True
+            )
+
+
+class ProjectInfoModal(discord.ui.Modal, title="Project Details"): 
+    project_id_input = discord.ui.TextInput(
+        label="Project ID",
+        placeholder="Enter the Project ID",
+        required=True,
+        style=discord.TextStyle.short
+    )
+
+    def __init__(self, parent_view: 'CodingPanelView', lang: str):
+        super().__init__()
+        self.parent_view = parent_view
+        self.lang = lang
+        self.project_id_input.label = i18n.translate(self.lang, "CODING.MODAL_PROJ_ID_LABEL")
+        self.project_id_input.placeholder = i18n.translate(self.lang, "CODING.MODAL_PROJ_ID_PLACEHOLDER")
+        self.title = i18n.translate(self.lang, "CODING.MODAL_PROJ_INFO_TITLE")
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        project_id = self.project_id_input.value.strip()
+        user_id = interaction.user.id
+
+        project = await self.parent_view.project_manager.get_project(user_id, project_id)
+
+        if not project:
+            await interaction.followup.send(i18n.translate(self.lang, "CODING.PROJ_NOT_FOUND", project_id=project_id), ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=i18n.translate(self.lang, "CODING.PROJ_DETAILS_TITLE"),
+            color=discord.Color.green()
+        )
+        embed.add_field(name=i18n.translate(self.lang, "CODING.PROJ_ID"), value=f"`{project["id"]}`", inline=False)
+        embed.add_field(name=i18n.translate(self.lang, "CODING.PROJ_NAME"), value=project["name"], inline=False)
+        embed.add_field(name=i18n.translate(self.lang, "CODING.PROJ_CREATED_AT"), value=f"<t:{int(project["created_at"])}:F>", inline=False)
+        embed.add_field(name=i18n.translate(self.lang, "CODING.PROJ_UPDATED_AT"), value=f"<t:{int(project["updated_at"])}:F>", inline=False)
+        embed.add_field(name=i18n.translate(self.lang, "CODING.PROJ_FILES_DIR"), value=f"`{project["files_dir"]}`", inline=False)
+        embed.set_footer(text="Made by RovaexTeam")
+
+        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 class CodingPanelView(discord.ui.View):
@@ -24,6 +110,7 @@ class CodingPanelView(discord.ui.View):
         super().__init__(timeout=None)
         self.bot = bot
         self.session_manager = SessionManager(bot)
+        self.project_manager = ProjectManager()
     
     async def _get_user_lang(self, interaction: discord.Interaction):
         db_session = self.bot.db_manager.get_session()
@@ -121,13 +208,36 @@ class CodingPanelView(discord.ui.View):
             await db_session.close()
     
     async def _handle_list(self, interaction: discord.Interaction, lang: str):
-        await interaction.followup.send(f"📋 **{i18n.translate(lang, 'CODING.PROJ_LIST')} (Coming Soon)**", ephemeral=True)
+        await interaction.response.defer(ephemeral=True)
+        user_id = interaction.user.id
+        projects = await self.project_manager.list_projects(user_id)
+
+        if not projects:
+            await interaction.followup.send(i18n.translate(lang, "CODING.PROJ_LIST_EMPTY"), ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=i18n.translate(lang, "CODING.PROJ_LIST_TITLE"),
+            description=i18n.translate(lang, "CODING.PROJ_LIST_DESC"),
+            color=discord.Color.blue()
+        )
+
+        for project in projects:
+            embed.add_field(
+                name=f"`{project['id'][:8]}`: {project['name']}",
+                value=f"Created: <t:{int(project['created_at'])}:R>\nUpdated: <t:{int(project['updated_at'])}:R>",
+                inline=False
+            )
+        embed.set_footer(text="Made by RovaexTeam")
+        await interaction.followup.send(embed=embed, ephemeral=True)
     
     async def _handle_info(self, interaction: discord.Interaction, lang: str):
-        await interaction.followup.send(f"ℹ️ **{i18n.translate(lang, 'CODING.PROJ_INFO')} (Coming Soon)**", ephemeral=True)
+        modal = ProjectInfoModal(self, lang)
+        await interaction.response.send_modal(modal)
     
     async def _handle_rename(self, interaction: discord.Interaction, lang: str):
-        await interaction.followup.send(f"✏️ **{i18n.translate(lang, 'CODING.PROJ_RENAME')} (Coming Soon)**", ephemeral=True)
+        modal = ProjectRenameModal(self, lang)
+        await interaction.response.send_modal(modal)
 
 
 class CodingCog(commands.Cog):
