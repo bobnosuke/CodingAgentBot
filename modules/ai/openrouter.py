@@ -30,8 +30,6 @@ class GeminiClient:
         max_tokens: int = 2000,
     ):
         try:
-            async for model in self.client.aio.models.list():
-                print(model.name)
             contents = []
             system_instruction = None
             for message in messages:
