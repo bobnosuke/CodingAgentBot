@@ -31,6 +31,7 @@ class RequirementApprovalView(discord.ui.View):
             
         await interaction.response.send_message("コードを生成しています。しばらくお待ちください。")
         print("メッセージ送信完了")
+        ch=interaction.channel
         
         # Progress notification callback
         async def update_progress(msg, status):
@@ -47,7 +48,7 @@ class RequirementApprovalView(discord.ui.View):
                 description=f"{emoji} **{msg}**",
                 color=discord.Color.blue()
             )
-            await interaction.edit_original_response(content=None, embed=embed, view=None)
+            await ch.send(content=None, embed=embed, view=None)
 
         self.agent.on_progress = update_progress
         
