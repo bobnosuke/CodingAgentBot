@@ -125,12 +125,12 @@ class OpenRouterClient:
 class AIService:
     """High-level AI service for CoderAgent"""
     
-    def __init__(self, openrouter_client: OpenRouterClient, gemini_client: Optional[CerebrasClient] = None):
+    def __init__(self, openrouter_client: OpenRouterClient, cerebras_client: Optional[CerebrasClient] = None):
         """
         Initialize AI service
         """
         self.openrouter_client = openrouter_client
-        self.cerebras_client = gemini_client
+        self.cerebras_client = cerebras_client
         self.current_model = "meta-llama/llama-3.3-70b-instruct:free"
     
     def set_model_by_preset(self, preset: str):
@@ -154,7 +154,7 @@ class AIService:
         conversation_history: List[Dict[str, str]] = None,
         model: Optional[str] = None,
         language: str = "en-US",
-        use_gemini: bool = False
+        use_cerebras: bool = False
     ) -> AsyncGenerator[str, None]:
         """
         Generate code based on user prompt
@@ -186,7 +186,7 @@ When generating code:
             "content": user_prompt
         })
         
-        if use_gemini and self.cerebras_client:
+        if use_cerebras and self.cerebras_client:
             async for chunk in self.cerebras_client.generate_content(
                 messages=messages,
                 temperature=0.7,
@@ -210,7 +210,7 @@ When generating code:
         model: Optional[str] = None,
         language: str = "en-US",
         system_override: Optional[str] = None,
-        use_gemini: bool = False
+        use_cerebras: bool = False
     ) -> AsyncGenerator[str, None]:
         """
         Chat with AI assistant
@@ -238,7 +238,7 @@ Be concise, clear, and practical in your responses."""
             "content": user_message
         })
         
-        if use_gemini and self.cerebras_client:
+        if use_cerebras and self.cerebras_client:
             async for chunk in self.cerebras_client.generate_content(
                 messages=messages,
                 temperature=0.7,

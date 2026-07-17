@@ -43,7 +43,7 @@ class CodingAgent:
         Phase 1: Define requirements.
         Translates vague user requests into a structured JSON for implementation.
         """
-        from modules.ai.prompts_gemini import GEMINI_REQUIREMENT_PROMPT
+        from modules.ai.prompts_cerebras import CEREBRAS_REQUIREMENT_PROMPT
         
         logger.info(f"Defining requirements for: {user_request[:50]}...")
         
@@ -52,9 +52,9 @@ class CodingAgent:
             async for chunk in self.ai_service.chat(
                 user_message=user_request,
                 conversation_history=history,
-                system_override=GEMINI_REQUIREMENT_PROMPT,
+                system_override=CEREBRAS_REQUIREMENT_PROMPT,
                 language="ja",
-                use_gemini=True
+                use_cerebras=True
             ):
                 response_text += chunk
             
