@@ -6,10 +6,16 @@ from modules.database.repository import RequirementRepository
 class RequirementApprovalView(discord.ui.View):
     """View for approving or refining requirements defined by Gemini"""
     
-    def __init__(self, agent: CodingAgent, db_session, requirement_id: int, user_id: str, lang: str):
+    def __init__(
+        self,
+        agent: CodingAgent,
+        requirement_id: int,
+        user_id: str,
+        lang: str
+    ):
         super().__init__(timeout=600)
+    
         self.agent = agent
-        self.db_session = db_session
         self.requirement_id = requirement_id
         self.user_id = user_id
         self.lang = lang
@@ -42,25 +48,54 @@ class RequirementApprovalView(discord.ui.View):
 
         self.agent.on_progress = update_progress
         
-        # Get requirement from DB
-        requirement = await RequirementRepository.get_requirement(self.db_session, self.requirement_id)
-        if not requirement:
-            return await interaction.followup.send("❌ 要件データが見つかりませんでした。最初からやり直してください。", ephemeral=True)
+        db = interaction.client.db_manager.get_session()
 
-        # Update status to approved
-        await RequirementRepository.approve_requirement(self.db_session, self.requirement_id)
+        try:
+            requirement = await RequirementRepository.get_requirement(
+                db,
+                self.requirement_id
+            )
         
-        # Phase 2: Implementation
-        # Using a dummy session_id for now as it's required by the new agent implementation
-        session_id = f"session_{interaction.channel_id}"
-        result = await self.agent.execute_task(requirement.json_data, session_id=session_id)
+            if not requirement:
+                return await interaction.followup.send(
+                    "❌ 要件データが見つかりませんでした。",
+                    ephemeral=True
+                )
         
-        if "error" in result:
-            await interaction.followup.send(i18n.translate(self.lang, "CODING.IMPLEMENTATION_ERROR", error=result['error']))
-            return
-
-        # Update status to completed
-        await RequirementRepository.update_requirement(self.db_session, self.requirement_id, status="completed")
+            await RequirementRepository.approve_requirement(
+                db,
+                self.requirement_id
+            )
+        
+            requirement_json = requirement.json_data
+        
+            if isinstance(requirement_json, str):
+                requirement_json = json.loads(requirement_json)
+        
+            session_id = f"session_{interaction.channel_id}"
+        
+            result = await self.agent.execute_task(
+                requirement_json,
+                session_id=session_id
+            )
+        
+            if "error" in result:
+                return await interaction.followup.send(
+                    i18n.translate(
+                        self.lang,
+                        "CODING.IMPLEMENTATION_ERROR",
+                        error=result["error"]
+                    )
+                )
+        
+            await RequirementRepository.update_requirement(
+                db,
+                self.requirement_id,
+                status="completed"
+            )
+        
+        finally:
+            await db.close()
 
         # ファイル保存ロジック（実際にはSessionManager等を通じて行う）
         embed = discord.Embed(title=i18n.translate(self.lang, "CODING.IMPLEMENTATION_SUCCESS"), color=discord.Color.green())
@@ -99,14 +134,30 @@ class RefinementModal(discord.ui.Modal, title="Refine Requirements"):
         self.parent_view.refine_count += 1
         
         # Get current requirement from DB
-        current_req = await RequirementRepository.get_requirement(self.parent_view.db_session, self.parent_view.requirement_id)
+        db = interaction.client.db_manager.get_session()
+        try:
+            current_req = await RequirementRepository.get_requirement(
+                db,
+                self.parent_view.requirement_id
+            )
         if not current_req:
             return await interaction.followup.send("❌ 要件データが見つかりませんでした。", ephemeral=True)
 
         # Geminiに再依頼
         new_req = await self.parent_view.agent.define_requirements(
             self.feedback.value, 
-            history=[{"role": "assistant", "content": json.dumps(current_req.json_data, ensure_ascii=False)}]
+            requirement_json = current_req.json_data
+            if isinstance(requirement_json, str):
+                requirement_json = json.loads(requirement_json)      
+            history=[
+                {
+                    "role":"assistant",
+                    "content":json.dumps(
+                        requirement_json,
+                        ensure_ascii=False
+                    )
+                }
+            ]
         )
         
         # Update requirement in DB
