@@ -16,7 +16,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./storage:/app/storage
       - ./logs:/app/logs
-      - coderagent_data:/app/coderagent.db
+      - coderagent_data:/app/data
 
     logging:
       driver: "json-file"
