@@ -25,7 +25,7 @@ class CerebrasClient:
         max_tokens=2000
     ):
         response = await self.client.chat.completions.create(
-            model="llama3.3-70b",
+            model="gpt-oss-120b",
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
