@@ -13,9 +13,10 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY}
 
     volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
       - ./storage:/app/storage
       - ./logs:/app/logs
-      - coderagent_data:/app/data
+      - coderagent_data:/app/coderagent.db
 
     logging:
       driver: "json-file"
