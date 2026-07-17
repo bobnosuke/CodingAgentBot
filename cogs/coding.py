@@ -246,6 +246,122 @@ class CodingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.session_manager = SessionManager(bot)
+        self.project_manager = ProjectManager() # Add ProjectManager initialization
+
+    async def _get_user_lang_from_message(self, message: discord.Message):
+        db_session = self.bot.db_manager.get_session()
+        try:
+            user = await UserRepository.get_or_create_user(
+                db_session, 
+                str(message.author.id), 
+                message.author.name, 
+                message.author.discriminator
+            )
+            return user.language or "en-US"
+        finally:
+            await db_session.close()
+
+    async def _handle_room_list(self, message: discord.Message):
+        lang = await self._get_user_lang_from_message(message)
+        user_id = message.author.id
+        projects = await self.project_manager.list_projects(user_id)
+
+        if not projects:
+            await message.reply(i18n.translate(lang, "CODING.PROJ_LIST_EMPTY"))
+            return
+
+        embed = discord.Embed(
+            title=i18n.translate(lang, "CODING.PROJ_LIST_TITLE"),
+            description=i18n.translate(lang, "CODING.PROJ_LIST_DESC"),
+            color=discord.Color.blue()
+        )
+
+        for project in projects:
+            embed.add_field(
+                name=f"`{project["id"][:8]}`: {project["name"]}",
+                value=f"Created: <t:{int(project["created_at"])}:R>\nUpdated: <t:{int(project["updated_at"])}:R>",
+                inline=False
+            )
+        embed.set_footer(text="Made by RovaexTeam")
+        await message.reply(embed=embed)
+
+    async def _handle_room_get(self, message: discord.Message, command: str):
+        lang = await self._get_user_lang_from_message(message)
+        parts = command.split(' ', 1)
+        if len(parts) < 2:
+            await message.reply(i18n.translate(lang, "CODING.GET_COMMAND_USAGE"))
+            return
+        
+        project_id = parts[1].strip()
+        user_id = message.author.id
+
+        project = await self.project_manager.get_project(user_id, project_id)
+
+        if not project:
+            await message.reply(i18n.translate(lang, "CODING.PROJ_NOT_FOUND", project_id=project_id))
+            return
+
+        files_dir = project["files_dir"]
+        
+        # Create a temporary zip file
+        zip_file_path = f"/tmp/{project_id}.zip"
+        await self.project_manager.zip_project_files(files_dir, zip_file_path)
+
+        try:
+            await message.reply(i18n.translate(lang, "FILE.ZIP_PREPARING"))
+            await message.channel.send(file=discord.File(zip_file_path))
+            await message.channel.send(i18n.translate(lang, "FILE.ZIP_SENT"))
+        except Exception as e:
+            logger.error(f"Error sending zip file: {e}", exc_info=True)
+            await message.reply(i18n.translate(lang, "COMMON.ERROR", error=str(e)))
+        finally:
+            # Clean up the temporary zip file
+            import os
+            if os.path.exists(zip_file_path):
+                os.remove(zip_file_path)
+
+    async def _handle_room_readme(self, message: discord.Message):
+        lang = await self._get_user_lang_from_message(message)
+        channel_id = str(message.channel.id)
+        session_uuid = None
+        for uuid, info in self.session_manager.active_sessions.items():
+            if info["channel_id"] == channel_id:
+                session_uuid = uuid
+                break
+
+        if not session_uuid:
+            await message.reply(i18n.translate(lang, "CODING.NO_ACTIVE_SESSION"))
+            return
+
+        session_info = self.session_manager.active_sessions[session_uuid]
+        user_id = session_info["discord_user_id"]
+
+        project = await self.project_manager.get_active_project(user_id)
+
+        if not project:
+            await message.reply(i18n.translate(lang, "CODING.NO_ACTIVE_PROJECT"))
+            return
+
+        readme_path = os.path.join(project["files_dir"], "README.md")
+
+        if not os.path.exists(readme_path):
+            await message.reply(i18n.translate(lang, "CODING.README_NOT_FOUND"))
+            return
+
+        try:
+            with open(readme_path, "r", encoding="utf-8") as f:
+                readme_content = f.read()
+            
+            if len(readme_content) > 2000:
+                # Discord message limit is 2000 characters
+                await message.reply(i18n.translate(lang, "CODING.README_TOO_LONG"))
+                # Optionally, send as a file
+                await message.channel.send(file=discord.File(readme_path))
+            else:
+                await message.reply(f"```markdown\n{readme_content}\n```")
+        except Exception as e:
+            logger.error(f"Error reading README.md: {e}", exc_info=True)
+            await message.reply(i18n.translate(lang, "COMMON.ERROR", error=str(e)))
     
     coding_group = app_commands.Group(
         name="coding", 
@@ -291,6 +407,13 @@ class CodingCog(commands.Cog):
             return
 
         if message.content.startswith(self.bot.command_prefix):
+            command = message.content[len(self.bot.command_prefix):].strip().lower()
+            if command == "list":
+                await self._handle_room_list(message)
+            elif command.startswith("get "):
+                await self._handle_room_get(message, command)
+            elif command == "readme":
+                await self._handle_room_readme(message)
             return
 
         # Check if session is already processing

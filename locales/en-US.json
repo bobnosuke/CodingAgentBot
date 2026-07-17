@@ -114,7 +114,12 @@
         "REFINE_BUTTON": "Refine Requirements",
         "IMPLEMENTING": "🚀 Starting implementation. Please wait...",
         "IMPLEMENTATION_SUCCESS": "✅ Implementation completed!",
-        "IMPLEMENTATION_ERROR": "❌ Error during implementation: {error}"
+        "IMPLEMENTATION_ERROR": "❌ Error during implementation: {error}",
+        "GET_COMMAND_USAGE": "Please specify a project ID, e.g., `!get <project_id>`.",
+        "NO_ACTIVE_SESSION": "❌ No active session found. Please start a session with `/coding start`.",
+        "NO_ACTIVE_PROJECT": "❌ No active project found.",
+        "README_NOT_FOUND": "❌ README.md not found.",
+        "README_TOO_LONG": "⚠️ README.md content is too long, sending as a file."
     },
     "FILE": {
         "DOWNLOAD_TITLE": "📦 File Download",

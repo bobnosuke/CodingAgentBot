@@ -114,7 +114,12 @@
         "REFINE_BUTTON": "修正を依頼する",
         "IMPLEMENTING": "🚀 実装を開始します。少々お待ちください...",
         "IMPLEMENTATION_SUCCESS": "✅ 実装が完了しました！",
-        "IMPLEMENTATION_ERROR": "❌ 実装中にエラーが発生しました: {error}"
+        "IMPLEMENTATION_ERROR": "❌ 実装中にエラーが発生しました: {error}",
+        "GET_COMMAND_USAGE": "`!get <project_id>` のようにプロジェクトIDを指定してください。",
+        "NO_ACTIVE_SESSION": "❌ アクティブなセッションがありません。`/coding start` でセッションを開始してください。",
+        "NO_ACTIVE_PROJECT": "❌ アクティブなプロジェクトがありません。",
+        "README_NOT_FOUND": "❌ README.md が見つかりませんでした。",
+        "README_TOO_LONG": "⚠️ README.md の内容が長すぎるため、ファイルとして送信します。"
     },
     "FILE": {
         "DOWNLOAD_TITLE": "📦 ファイルダウンロード",
