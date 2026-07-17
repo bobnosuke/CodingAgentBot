@@ -65,11 +65,15 @@ class RequirementApprovalView(discord.ui.View):
                     "❌ 要件データが見つかりませんでした。",
                     ephemeral=True
                 )
+                
+            print("approve_requirement start")
         
             await RequirementRepository.approve_requirement(
                 db,
                 self.requirement_id
             )
+            
+            print("approve_requirement end")
         
             requirement_json = requirement.json_data
         
