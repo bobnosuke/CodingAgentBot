@@ -73,7 +73,7 @@ class RequirementApprovalView(discord.ui.View):
 class RefinementModal(discord.ui.Modal, title="Refine Requirements"):
     feedback = discord.ui.TextInput(
         label="Feedback",
-        style=discord.ui.TextInputStyle.paragraph,
+        style=style=discord.TextStyle.paragraph,
         placeholder="Example: Change the output to Discord instead of email.",
         required=True,
         max_length=500
