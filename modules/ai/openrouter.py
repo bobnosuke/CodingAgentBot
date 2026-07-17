@@ -15,13 +15,9 @@ logger = setup_logger(__name__)
 
 class GeminiClient:
     """Client for Gemini API communication"""
+
     def __init__(self, api_key: str):
-        self.client = genai.Client(
-            api_key=api_key,
-            http_options=types.HttpOptions(
-                api_version="v1"
-            )
-        )
+        self.client = genai.Client(api_key=api_key)
 
     async def generate_content(
         self,
@@ -30,41 +26,52 @@ class GeminiClient:
         max_tokens: int = 2000,
     ):
         try:
-            contents = []
+            contents: List[types.Content] = []
             system_instruction = None
+
             for message in messages:
                 role = message["role"]
                 text = message["content"]
+
                 if role == "system":
                     system_instruction = text
+
                 elif role == "user":
                     contents.append(
                         types.Content(
                             role="user",
-                            parts=[types.Part.from_text(text=text)]
+                            parts=[
+                                types.Part.from_text(text=text)
+                            ],
                         )
                     )
+
                 elif role == "assistant":
                     contents.append(
                         types.Content(
                             role="model",
-                            parts=[types.Part.from_text(text=text)]
+                            parts=[
+                                types.Part.from_text(text=text)
+                            ],
                         )
                     )
+
             response = await self.client.aio.models.generate_content(
                 model="gemini-flash-latest",
                 contents=contents,
                 config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
                     temperature=temperature,
                     max_output_tokens=max_tokens,
-                    system_instruction=system_instruction,
                 ),
             )
+
             if response.text:
                 yield response.text
             else:
                 yield "Geminiから応答がありませんでした。"
-        except Exception as e:
+
+        except Exception:
             logger.exception("Error calling Gemini API")
             raise
 
