@@ -13,6 +13,7 @@
 - **`modules/ai/openrouter.py`**: `import json` の位置がモジュール先頭に移動され、コード規約に準拠しました。
 - **`cogs/file.py`**: `!download` コマンドにおいて、選択されたファイルを ZIP 圧縮して送信する `_send_zip` ロジックが実装されました。
 - **プロジェクト管理モジュール**: `modules/project/manager.py` が新規作成され、プロジェクトの永続化と管理の基盤が構築されました。
+- **AIエンジン移行**: 要件定義用AIを Google Gemini から Cerebras API (llama3.3-70b) へ移行し、パフォーマンスと応答速度が向上しました。
 
 ## 3. 継続中の課題および新たな改善点
 
