@@ -45,6 +45,7 @@ class Config:
     
     # Gemini API
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+    CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
 
     # AI Configuration
     DEFAULT_AI_MODEL = "openrouter/auto"
@@ -54,6 +55,9 @@ class Config:
     def validate(cls) -> bool:
         """Validate required configuration"""
         required = ["DISCORD_TOKEN", "OPENROUTER_API_KEY"]
+        # If GEMINI_API_KEY is not set, CEREBRAS_API_KEY is required for requirement definition
+        if not cls.GEMINI_API_KEY:
+            required.append("CEREBRAS_API_KEY")
         missing = [key for key in required if not getattr(cls, key)]
         
         if missing:

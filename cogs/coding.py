@@ -8,7 +8,7 @@ from discord import app_commands
 from logger import setup_logger
 from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository, UsageLogRepository
 from modules.session.manager import SessionManager
-from modules.ai.openrouter import OpenRouterClient, AIService, GeminiClient
+from modules.ai.openrouter import OpenRouterClient, AIService, CerebrasClient
 from config import Config
 import json
 from modules.utils.i18n import i18n
@@ -207,10 +207,10 @@ class CodingCog(commands.Cog):
                 formatted_history = [{"role": m.role, "content": m.content} for m in history[-10:]]
                 
                 openrouter_client = OpenRouterClient(decrypted_key)
-                gemini_client = None
-                if Config.GEMINI_API_KEY:
-                    gemini_client = GeminiClient(Config.GEMINI_API_KEY)
-                ai_service = AIService(openrouter_client, gemini_client)
+                cerebras_client = None
+                if Config.CEREBRAS_API_KEY:
+                    cerebras_client = CerebrasClient(Config.CEREBRAS_API_KEY)
+                ai_service = AIService(openrouter_client, cerebras_client)
 
                 ai_service.set_model_by_preset(getattr(user, "model_preset", "balance"))
                 
