@@ -78,15 +78,16 @@ class GeminiClient:
 class OpenRouterClient:
     """Client for OpenRouter API communication"""
     
-    def __init__(self, api_key: str):
+    def __init__(self, api_key: str, base_url: str = None):
         """
         Initialize OpenRouter client
         
         Args:
             api_key: OpenRouter API key
+            base_url: Optional base URL
         """
         self.api_key = api_key
-        self.base_url = Config.OPENROUTER_BASE_URL
+        self.base_url = base_url or Config.OPENROUTER_BASE_URL
         self.timeout = aiohttp.ClientTimeout(total=Config.AI_TIMEOUT_SECONDS)
     
     async def create_message(
@@ -102,7 +103,9 @@ class OpenRouterClient:
         """
         headers = {
             "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://github.com/bobnosuke/CodingAgentBot",
+            "X-Title": "CoderAgentBot"
         }
         
         payload = {
@@ -115,8 +118,9 @@ class OpenRouterClient:
         
         try:
             async with aiohttp.ClientSession(timeout=self.timeout) as session:
+                url = f"{self.base_url}/chat/completions".replace("//chat", "/chat")
                 async with session.post(
-                    f"{self.base_url}/chat/completions",
+                    url,
                     json=payload,
                     headers=headers
                 ) as response:
