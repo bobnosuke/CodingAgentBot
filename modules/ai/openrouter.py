@@ -50,7 +50,7 @@ class GeminiClient:
                         ]
                     })
             response = await self.client.aio.models.generate_content(
-                model="gemini-2.5-flash-lite",
+                model="gemini-2.5-flash",
                 contents=contents,
                 config=types.GenerateContentConfig(
                     temperature=temperature,
