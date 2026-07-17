@@ -140,37 +140,39 @@ class RefinementModal(discord.ui.Modal, title="Refine Requirements"):
                 db,
                 self.parent_view.requirement_id
             )
-        if not current_req:
-            return await interaction.followup.send("❌ 要件データが見つかりませんでした。", ephemeral=True)
-
-        # Geminiに再依頼
-        new_req = await self.parent_view.agent.define_requirements(
-            self.feedback.value, 
+            if not current_req:
+                return await interaction.followup.send("❌ 要件データが見つかりませんでした。", ephemeral=True)
+    
+            # Geminiに再依頼
             requirement_json = current_req.json_data
             if isinstance(requirement_json, str):
-                requirement_json = json.loads(requirement_json)      
-            history=[
-                {
-                    "role":"assistant",
-                    "content":json.dumps(
-                        requirement_json,
-                        ensure_ascii=False
-                    )
-                }
-            ]
-        )
-        
-        # Update requirement in DB
-        await RequirementRepository.update_requirement(
-            self.parent_view.db_session, 
-            self.parent_view.requirement_id, 
-            json_data=new_req
-        )
-        
-        from modules.utils.i18n import i18n
-        # Embedを更新して再提示
-        embed = discord.Embed(title=f"{i18n.translate(self.parent_view.lang, 'CODING.REQUIREMENT_TITLE')} ({self.parent_view.refine_count}/3)", color=discord.Color.blue())
-        embed.add_field(name=i18n.translate(self.parent_view.lang, 'CODING.REQUIREMENT_SUMMARY'), value=new_req.get("task_summary", "Unknown"), inline=False)
-        embed.add_field(name=i18n.translate(self.parent_view.lang, 'CODING.REQUIREMENT_TECH'), value="\n".join(new_req.get("technical_requirements", [])), inline=False)
-        
-        await interaction.edit_original_response(embed=embed, view=self.parent_view)
+                requirement_json = json.loads(requirement_json)
+            new_req = await self.parent_view.agent.define_requirements(
+                self.feedback.value,
+                history=[
+                    {
+                        "role": "assistant",
+                        "content": json.dumps(
+                            requirement_json,
+                            ensure_ascii=False
+                        )
+                    }
+                ]
+            )
+            
+            # Update requirement in DB
+            await RequirementRepository.update_requirement(
+                self.parent_view.db_session, 
+                self.parent_view.requirement_id, 
+                json_data=new_req
+            )
+            
+            from modules.utils.i18n import i18n
+            # Embedを更新して再提示
+            embed = discord.Embed(title=f"{i18n.translate(self.parent_view.lang, 'CODING.REQUIREMENT_TITLE')} ({self.parent_view.refine_count}/3)", color=discord.Color.blue())
+            embed.add_field(name=i18n.translate(self.parent_view.lang, 'CODING.REQUIREMENT_SUMMARY'), value=new_req.get("task_summary", "Unknown"), inline=False)
+            embed.add_field(name=i18n.translate(self.parent_view.lang, 'CODING.REQUIREMENT_TECH'), value="\n".join(new_req.get("technical_requirements", [])), inline=False)
+            
+            await interaction.edit_original_response(embed=embed, view=self.parent_view)
+        finally:
+            await db.close()
