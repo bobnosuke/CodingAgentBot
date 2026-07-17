@@ -3,6 +3,9 @@ import os
 from typing import Dict, Any, Optional
 import discord
 from discord import app_commands
+from logger import setup_logger
+
+logger = setup_logger(__name__)
 
 
 
@@ -23,7 +26,7 @@ class I18nManager:
         """Load all JSON files from locales directory"""
         locales_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "locales")
         if not os.path.exists(locales_dir):
-            print(f"ERROR: Locales directory not found: {locales_dir}")
+            logger.error(f"Locales directory not found: {locales_dir}")
             return
         
         for filename in os.listdir(locales_dir):
@@ -32,9 +35,9 @@ class I18nManager:
                 try:
                     with open(os.path.join(locales_dir, filename), 'r', encoding='utf-8') as f:
                         self._locales[lang_code] = json.load(f)
-                    print(f"INFO: Loaded locale: {lang_code}")
+                    logger.info(f"Loaded locale: {lang_code}")
                 except Exception as e:
-                    print(f"ERROR: Failed to load locale {lang_code}: {e}")
+                    logger.error(f"Failed to load locale {lang_code}: {e}")
     
     def translate(self, lang: str, key_path: str, **kwargs) -> str:
         """
@@ -59,7 +62,7 @@ class I18nManager:
             try:
                 return value.format(**kwargs)
             except KeyError as e:
-                print(f"WARNING: Missing format variable {e} in {key_path}")
+                logger.warning(f"Missing format variable {e} in {key_path}")
                 return value
         
         return key_path
