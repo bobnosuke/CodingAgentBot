@@ -25,10 +25,12 @@ class RequirementApprovalView(discord.ui.View):
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
         print("approve called")
         from modules.utils.i18n import i18n
+        print("モジュールインポート完了")
         if str(interaction.user.id) != self.user_id:
             return await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
             
         await interaction.response.defer()
+        print("defer完了")
         
         # Progress notification callback
         async def update_progress(msg, status):
