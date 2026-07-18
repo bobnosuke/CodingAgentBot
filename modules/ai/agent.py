@@ -103,7 +103,8 @@ class CodingAgent:
         
         # Build image once for this session
         try:
-            await self.executor.build_image(session_id)
+            if not self.executor.image_exists():
+                await self.executor.build_image()
             print("docker build完了")
             await self._notify_progress("実行環境の準備が完了しました。", "setup_complete")
         except Exception as e:
