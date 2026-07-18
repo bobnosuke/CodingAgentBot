@@ -17,7 +17,7 @@ class DockerExecutor:
     def get_image_name(self, session_id):
         return f"coderagent-exec:{session_id}"
         
-    def image_exists(self):
+    def image_exists(self, session_id: str):
         image_name = self.get_image_name(session_id)
         try:
             self.client.images.get(image_name)
