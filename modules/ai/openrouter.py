@@ -131,7 +131,7 @@ class AIService:
         """
         self.openrouter_client = openrouter_client
         self.cerebras_client = cerebras_client
-        from config.ai_models import model_manager
+        from configs.ai_models import model_manager
         self.model_manager = model_manager
         self.current_quality = "standard"
     
