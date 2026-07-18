@@ -310,5 +310,5 @@ class SettingCog(commands.Cog):
             await db_session.close()
 
 async def setup(bot: commands.Bot):
-"""Setup the cog"""
+    """Setup the cog"""
     await bot.add_cog(SettingCog(bot))
