@@ -442,6 +442,7 @@ class CodingCog(commands.Cog):
                 openrouter_client = OpenRouterClient(decrypted_key)
                 cerebras_client = None
                 if Config.CEREBRAS_API_KEY:
+                    print("Cerebras API Key detected")
                     cerebras_client = CerebrasClient(Config.CEREBRAS_API_KEY)
                 ai_service = AIService(openrouter_client, cerebras_client)
 
