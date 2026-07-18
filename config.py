@@ -44,7 +44,6 @@ class Config:
     MAX_FILES_PER_SESSION = 50
     
     CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
-    print("Cerebras Key:", bool(Config.CEREBRAS_API_KEY))
 
     # AI Configuration
     DEFAULT_AI_MODEL = "openrouter/auto"
@@ -69,3 +68,5 @@ class Config:
         
         print("✅ 設定が正常に検証されました")
         return True
+        
+print("Cerebras Key:", bool(Config.CEREBRAS_API_KEY))
