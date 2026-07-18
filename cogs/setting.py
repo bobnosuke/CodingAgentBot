@@ -95,15 +95,15 @@ class SettingDetailView(discord.ui.View):
         self.select.callback = self.select_callback
         self.add_item(self.select)
 
-        async def select_callback(self, interaction: discord.Interaction):
-            action = self.select.values[0]
+    async def select_callback(self, interaction: discord.Interaction):
+        action = self.select.values[0]
 
-            if action == "quality":
-                await self._show_quality_selection(interaction)
-            elif action == "apikey":
-                await self._show_apikey_mgmt(interaction)
-            elif action == "lang":
-                await self._show_lang_setting(interaction)
+        if action == "quality":
+            await self._show_quality_selection(interaction)
+        elif action == "apikey":
+            await self._show_apikey_mgmt(interaction)
+        elif action == "lang":
+            await self._show_lang_setting(interaction)
 
     async def _show_quality_selection(self, interaction: discord.Interaction):
         embed = discord.Embed(
