@@ -15,6 +15,7 @@ class DockerExecutor:
         self.requirements_path = os.path.join(project_root, "requirements.txt")
         
     def get_image_name(self, session_id):
+        # Use session_id as tag to avoid conflicts and handle per-session requirements
         return f"coderagent-exec:{session_id}"
         
     def image_exists(self, session_id: str):

@@ -7,6 +7,7 @@ import re
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from logger import setup_logger
 from .openrouter import AIService
+from .tools import AgentTools
 from modules.executor.docker_executor import DockerExecutor
 
 logger = setup_logger(__name__)
@@ -19,9 +20,10 @@ class CodingAgent:
     Phase 2: One-shot Implementation (Optimized for High-performance models)
     """
     
-    def __init__(self, ai_service: AIService, executor: Optional[DockerExecutor] = None, on_progress: Optional[callable] = None):
+    def __init__(self, ai_service: AIService, executor: Optional[DockerExecutor] = None, on_progress: Optional[callable] = None, base_path: str = "./storage"):
         self.ai_service = ai_service
         self.executor = executor or DockerExecutor()
+        self.tools = AgentTools(base_path)
         self.max_retries = 3
         self.on_progress = on_progress
 
@@ -72,23 +74,32 @@ class CodingAgent:
         system_prompt = """あなたはエキスパート自律コーディングエージェントです。
 提供された技術仕様（JSON）に基づき、完動するコードを実装してください。
 
-### 出力形式:
-必ず以下の構造を持つ単一のJSONオブジェクトとして出力してください:
-{
-  "plan": ["ステップ1: ...", "ステップ2: ..."],
-  "files": [
-    {
-      "path": "ファイルパス",
-      "content": "ファイルの内容",
-      "description": "ファイルの説明"
-    }
-  ],
-  "entrypoint": "実行するメインファイルのパス",
-  "verification": "テスト方法の説明",
-  "notes": "補足情報"
-}
+    ### ツール利用:
+    あなたは以下のツールを利用してファイル操作を行うことができます。直接ファイルを書き換えるのではなく、JSON内でツール呼び出しをシミュレートしてください。
+    - list_files()
+    - read_file(file_path)
+    - create_file(file_path, content)
+    - edit_file(file_path, find_text, replace_text)
+    - delete_file(file_path)
+    - move_file(src, dst)
+    - execute_project(entrypoint)
 
-余計な解説は不要です。JSONのみを出力してください。"""
+    ### 出力形式:
+    必ず以下の構造を持つ単一のJSONオブジェクトとして出力してください:
+    {
+      "plan": ["ステップ1: ...", "ステップ2: ..."],
+      "tool_calls": [
+        {
+          "tool": "create_file",
+          "parameters": {"file_path": "main.py", "content": "..."}
+        }
+      ],
+      "entrypoint": "実行するメインファイルのパス",
+      "verification": "テスト方法の説明",
+      "notes": "補足情報"
+    }
+    
+    余計な解説は不要です。JSONのみを出力してください。"""
 
         logger.info(f"Executing implementation for task: {requirement_json.get('task_summary', 'Unknown')}")
         
@@ -128,13 +139,29 @@ class CodingAgent:
                     continue
 
                 result = json.loads(json_match.group())
-                files = result.get("files", [])
+                tool_calls = result.get("tool_calls", [])
                 entrypoint = result.get("entrypoint")
 
-                if not files or not entrypoint:
-                    error_msg = "Files or entrypoint missing in JSON"
+                # Convert tool_calls to files for Docker execution (legacy support/internal compatibility)
+                files = []
+                for call in tool_calls:
+                    if call["tool"] == "create_file":
+                        files.append({
+                            "path": call["parameters"]["file_path"],
+                            "content": call["parameters"]["content"]
+                        })
+                    # Other tools like edit_file could be processed here if needed for state management
+
+                if not files and not tool_calls:
+                    error_msg = "No tool_calls or files provided"
                     logger.warning(error_msg)
-                    user_msg = f"エラーが発生しました: 'files' と 'entrypoint' を含めてください。詳細: {error_msg}"
+                    user_msg = f"エラーが発生しました: 'tool_calls' を含めてください。詳細: {error_msg}"
+                    continue
+                
+                if not entrypoint:
+                    error_msg = "Entrypoint missing in JSON"
+                    logger.warning(error_msg)
+                    user_msg = f"エラーが発生しました: 'entrypoint' を含めてください。詳細: {error_msg}"
                     continue
 
                 # Execute and verify
