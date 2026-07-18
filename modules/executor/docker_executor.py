@@ -21,7 +21,8 @@ class DockerExecutor:
             logger.info(f"Building Docker image {image_name}...")
             # Ensure Dockerfile.exec and requirements.txt are in the build context
             # For simplicity, assuming they are in project_root
-            self.client.images.build(
+            await asyncio.to_thread(
+                self.client.images.build,
                 path=self.project_root,
                 dockerfile=self.dockerfile_path,
                 tag=image_name,
