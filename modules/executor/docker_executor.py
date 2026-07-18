@@ -82,42 +82,26 @@ class DockerExecutor:
         # 2. Run the container
         try:
             logger.info(f"Running container {container_name} from image {image_name}...")
-            container = await asyncio.to_thread(
-                self.client.containers.create,
-                image_name,
-                command=f"python {entrypoint_file}",
-                name=container_name,
-                volumes={
-                    os.path.abspath(session_dir): {
-                        'bind':'/app',
-                        'mode':'rw'
-                    }
-                }
-            )
-            
             await asyncio.to_thread(container.start)
-            
             result = await asyncio.to_thread(
                 container.wait,
                 timeout=timeout
             )
-            
             logs = await asyncio.to_thread(
                 container.logs
             )
-            
+            logs = logs.decode("utf-8")
+            exit_code = result["StatusCode"]
+            logger.info(
+                f"Container {container_name} exited with code {exit_code}"
+            )
             await asyncio.to_thread(
                 container.remove
             )
-
-            # Wait for container to finish or timeout
-            result = container.wait(timeout=timeout)
-            logs = container.logs().decode('utf-8')
-
-            exit_code = result['StatusCode']
-            logger.info(f"Container {container_name} exited with code {exit_code}")
-            
-            return {"exit_code": exit_code, "logs": logs}
+            return {
+                "exit_code": exit_code,
+                "logs": logs
+            }
 
         except docker.errors.ContainerError as e:
             logs = e.container.logs().decode('utf-8')
