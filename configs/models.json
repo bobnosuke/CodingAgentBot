@@ -3,8 +3,7 @@
     "qwen/qwen3-coder:free",
     "qwen/qwen3-235b-a22b-thinking:free",
     "deepseek/deepseek-coder-v2:free",
-    "deepseek/deepseek-v3:free",
-    "openai/gpt-oss-20b"
+    "deepseek/deepseek-v3:free"
   ],
   "reasoning": [
     "meta-llama/llama-3.3-70b-instruct:free",
