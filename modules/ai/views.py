@@ -23,15 +23,11 @@ class RequirementApprovalView(discord.ui.View):
         
     @discord.ui.button(label="Start Implementation", style=discord.ButtonStyle.green, emoji="🚀")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
-        print("approve called")
         from modules.utils.i18n import i18n
-        print("モジュールインポート完了")
         if str(interaction.user.id) != self.user_id:
             return await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
             
-        await interaction.response.send_message("コードを生成しています。しばらくお待ちください。")
-        print("メッセージ送信完了")
-        ch=interaction.channel
+        await interaction.response.defer()
         
         # Progress notification callback
         async def update_progress(msg, status):
@@ -52,42 +48,30 @@ class RequirementApprovalView(discord.ui.View):
                 description=f"{emoji} **{msg}**",
                 color=discord.Color.blue()
             )
-        
-            print("Discord送信前")
-        
-            await ch.send(
+            await interaction.edit_original_response(
                 content=None,
                 embed=embed,
                 view=None
             )
-        
-            print("Discord送信後")
 
         self.agent.on_progress = update_progress
-        
         db = interaction.client.db_manager.get_session()
-
         try:
             requirement = await RequirementRepository.get_requirement(
                 db,
                 self.requirement_id
             )
-            print("要件データ取得完了")
         
             if not requirement:
                 return await interaction.followup.send(
                     "❌ 要件データが見つかりませんでした。",
                     ephemeral=True
                 )
-                
-            print("approve_requirement start")
         
             await RequirementRepository.approve_requirement(
                 db,
                 self.requirement_id
             )
-            
-            print("approve_requirement end")
         
             requirement_json = requirement.json_data
         
@@ -100,7 +84,6 @@ class RequirementApprovalView(discord.ui.View):
                 requirement_json,
                 session_id=session_id
             )
-            print("リザルト取得完了")
         
             if "error" in result:
                 return await interaction.followup.send(
@@ -116,7 +99,6 @@ class RequirementApprovalView(discord.ui.View):
                 self.requirement_id,
                 status="completed"
             )
-            print("要件アップデート完了")
         
         finally:
             await db.close()
