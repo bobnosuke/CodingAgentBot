@@ -27,25 +27,17 @@ class CodingAgent:
 
     async def _notify_progress(self, message, status):
         print("_notify_progress開始")
-        
+    
         if self.on_progress:
             print("callbackあり")
-            print("callback:", self.on_progress)
-            print("is coroutine:", asyncio.iscoroutinefunction(self.on_progress))
     
             try:
-                result = self.on_progress(message, status)
+                await self.on_progress(message, status)
     
-                print("callback実行後")
-                print("result:", result)
-    
-                if asyncio.iscoroutine(result):
-                    print("await開始")
-                    await result
-                    print("await完了")
+                print("callback完了")
     
             except Exception as e:
-                print(f"callback error: {e}")
+                print("callback error:", repr(e))
 
     async def define_requirements(self, user_request: str, history: list = []) -> dict:
         """
