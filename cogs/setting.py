@@ -27,53 +27,53 @@ class SettingView(discord.ui.View):
         custom_id="persistent:setting_start_button"
     )
     async def start_setting(self, interaction: discord.Interaction, button: discord.ui.Button):
-    """Handle 'Start Settings' button click - Show Ephemeral Panel"""
+        """Handle 'Start Settings' button click - Show Ephemeral Panel"""
         db_session = self.bot.db_manager.get_session()
-            try:
-                user = await UserRepository.get_or_create_user(
-                    db_session, 
-                    str(interaction.user.id), 
-                    interaction.user.name, 
-                    interaction.user.discriminator
-                )
-                lang = user.language or "en-US"
-                api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
-                daily_count = await UsageLogRepository.get_daily_usage_count(db_session, user.id)
+        try:
+            user = await UserRepository.get_or_create_user(
+                db_session, 
+                str(interaction.user.id), 
+                interaction.user.name, 
+                interaction.user.discriminator
+            )
+            lang = user.language or "en-US"
+            api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
+            daily_count = await UsageLogRepository.get_daily_usage_count(db_session, user.id)
 
-                # Quality level mapping for display
-                quality_labels = {
-                    "high_quality": "高品質",
-                    "standard": "標準",
-                    "fast": "高速"
-                }
-                current_quality = quality_labels.get(user.model_preset, "標準")
+            # Quality level mapping for display
+            quality_labels = {
+                "high_quality": "高品質",
+                "standard": "標準",
+                "fast": "高速"
+            }
+            current_quality = quality_labels.get(user.model_preset, "標準")
 
-                # AI Model Status
-                active_models = [m for m, s in model_manager.model_status.items() if s["status"] == "active"]
-                cooldown_models = [m for m, s in model_manager.model_status.items() if s["status"] == "cooldown"]
+            # AI Model Status
+            active_models = [m for m, s in model_manager.model_status.items() if s["status"] == "active"]
+            cooldown_models = [m for m, s in model_manager.model_status.items() if s["status"] == "cooldown"]
 
-                # Create Status Embed
-                embed = discord.Embed(
-                    title=i18n.translate(lang, "SETTING.CURRENT_STATUS_TITLE"),
-                    color=discord.Color.blue()
-                )
-                embed.add_field(name="AI品質", value=current_quality, inline=True)
-                embed.add_field(name=i18n.translate(lang, "SETTING.LANG_SETTING"), value="🇺🇸 English" if lang == "en-US" else "🇯🇵 日本語", inline=True)
-                embed.add_field(name="API Key", value="✅ Registered" if api_key else "❌ Not Registered", inline=True)
-                embed.add_field(name="今日利用回数", value=f"{daily_count} / 50", inline=True)
+            # Create Status Embed
+            embed = discord.Embed(
+                title=i18n.translate(lang, "SETTING.CURRENT_STATUS_TITLE"),
+                color=discord.Color.blue()
+            )
+            embed.add_field(name="AI品質", value=current_quality, inline=True)
+            embed.add_field(name=i18n.translate(lang, "SETTING.LANG_SETTING"), value="🇺🇸 English" if lang == "en-US" else "🇯🇵 日本語", inline=True)
+            embed.add_field(name="API Key", value="✅ Registered" if api_key else "❌ Not Registered", inline=True)
+            embed.add_field(name="今日利用回数", value=f"{daily_count} / 50", inline=True)
 
-                if active_models:
-                    embed.add_field(name="現在利用AI", value=", ".join(active_models[:3]), inline=False)
-                if cooldown_models:
-                    embed.add_field(name="現在Cooldown中AI", value=", ".join(cooldown_models[:3]), inline=False)
+            if active_models:
+                embed.add_field(name="現在利用AI", value=", ".join(active_models[:3]), inline=False)
+            if cooldown_models:
+                embed.add_field(name="現在Cooldown中AI", value=", ".join(cooldown_models[:3]), inline=False)
 
-                embed.set_footer(text="Made by RovaexTeam")
+            embed.set_footer(text="Made by RovaexTeam")
 
-                # Create Detail View with Select Menu
-                view = SettingDetailView(self.bot, lang)
-                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
-            finally:
-                await db_session.close()
+            # Create Detail View with Select Menu
+            view = SettingDetailView(self.bot, lang)
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        finally:
+            await db_session.close()
 
 
 class SettingDetailView(discord.ui.View):
@@ -96,14 +96,14 @@ class SettingDetailView(discord.ui.View):
         self.add_item(self.select)
 
         async def select_callback(self, interaction: discord.Interaction):
-        action = self.select.values[0]
+            action = self.select.values[0]
 
-        if action == "quality":
-            await self._show_quality_selection(interaction)
-        elif action == "apikey":
-            await self._show_apikey_mgmt(interaction)
-        elif action == "lang":
-            await self._show_lang_setting(interaction)
+            if action == "quality":
+                await self._show_quality_selection(interaction)
+            elif action == "apikey":
+                await self._show_apikey_mgmt(interaction)
+            elif action == "lang":
+                await self._show_lang_setting(interaction)
 
     async def _show_quality_selection(self, interaction: discord.Interaction):
         embed = discord.Embed(
@@ -120,24 +120,24 @@ class SettingDetailView(discord.ui.View):
 
     async def _show_apikey_mgmt(self, interaction: discord.Interaction):
         db_session = self.bot.db_manager.get_session()
-            try:
-                user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
-                api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
+        try:
+            user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
+            api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
 
-                if api_key:
-                    embed = discord.Embed(
-                        title=i18n.translate(self.lang, "SETTING.API_KEY_MGMT"),
-                        description=i18n.translate(self.lang, "SETTING.API_KEY_DELETE_CONFIRM"),
-                        color=discord.Color.red()
-                    )
-                    embed.set_footer(text="Made by RovaexTeam")
-                    view = APIKeyDeleteConfirmView(self.bot, self.lang)
-                    await interaction.response.edit_message(embed=embed, view=view)
-                else:
-                    modal = APIKeyModal(self.bot, self.lang)
-                    await interaction.response.send_modal(modal)
-            finally:
-                await db_session.close()
+            if api_key:
+                embed = discord.Embed(
+                    title=i18n.translate(self.lang, "SETTING.API_KEY_MGMT"),
+                    description=i18n.translate(self.lang, "SETTING.API_KEY_DELETE_CONFIRM"),
+                    color=discord.Color.red()
+                )
+                embed.set_footer(text="Made by RovaexTeam")
+                view = APIKeyDeleteConfirmView(self.bot, self.lang)
+                await interaction.response.edit_message(embed=embed, view=view)
+            else:
+                modal = APIKeyModal(self.bot, self.lang)
+                await interaction.response.send_modal(modal)
+        finally:
+            await db_session.close()
 
     async def _show_lang_setting(self, interaction: discord.Interaction):
         embed = discord.Embed(
@@ -255,7 +255,7 @@ class APIKeyDeleteConfirmView(discord.ui.View):
 
     @discord.ui.button(label="削除", style=discord.ButtonStyle.danger, emoji="🗑️")
     async def delete_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-    db_session = self.bot.db_manager.get_session()
+        db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_user_by_discord_id(db_session, str(interaction.user.id))
             api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
@@ -281,7 +281,7 @@ class SettingCog(commands.Cog):
         description="設定用パネルを表示します"
     )
     async def setting(self, interaction: discord.Interaction):
-    """Show User Settings Panel (Public Start Button)"""
+        """Show User Settings Panel (Public Start Button)"""
         db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_or_create_user(
@@ -304,8 +304,12 @@ class SettingCog(commands.Cog):
             for item in view.children:
                 if isinstance(item, discord.ui.Button) and item.custom_id == "persistent:setting_start_button":
                     item.label = i18n.translate(lang, "SETTING.START_BUTTON")
-
-                    await interaction.response.send_message(embed=embed, view=view, ephemeral=False)
+            
+            await interaction.response.send_message(
+                embed=embed,
+                view=view,
+                ephemeral=False
+            )
         finally:
             await db_session.close()
 
