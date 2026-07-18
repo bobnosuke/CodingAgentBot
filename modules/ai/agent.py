@@ -62,10 +62,12 @@ class CodingAgent:
             logger.error(f"Error in define_requirements: {e}")
             return {"error": str(e)}
 
-    async def execute_task(self, requirement_json: dict, context: dict = None, session_id: str = "default_session") -> dict:
+    async def execute_task(self, requirement_json: dict, context: dict = None, session_id: str = None) -> dict:
         """
         Phase 2: Execute implementation with self-correction loop.
         """
+        if not session_id:
+            raise ValueError("session_id is required")
         await self._notify_progress("環境のセットアップを開始します...", "setup")
         system_prompt = """あなたはエキスパート自律コーディングエージェントです。
 提供された技術仕様（JSON）に基づき、完動するコードを実装してください。
@@ -95,8 +97,8 @@ class CodingAgent:
         
         # Build image once for this session
         try:
-            if not self.executor.image_exists():
-                await self.executor.build_image()
+            if not self.executor.image_exists(session_id):
+                await self.executor.build_image(session_id)
             await self._notify_progress("実行環境の準備が完了しました。", "setup_complete")
         except Exception as e:
             logger.error(f"Failed to build Docker image: {e}")
