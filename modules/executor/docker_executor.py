@@ -45,7 +45,7 @@ class DockerExecutor:
         timeout: int = 60
     ) -> Dict[str, Any]:
         
-        image_name = f"coderagent-exec:{session_id}"
+        image_name = "coderagent-exec:latest"
         container_name = f"coderagent-container-{session_id}"
         session_dir = os.path.join(self.project_root, session_id)
 
