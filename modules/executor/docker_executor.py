@@ -22,19 +22,24 @@ class DockerExecutor:
         except docker.errors.ImageNotFound:
             return False
 
-    async def build_image(self) -> str:
+    async def build_image(self, session_id: str = None) -> str:
         image_name = self.IMAGE_NAME
         try:
             logger.info(f"Building Docker image {image_name}...")
-            # Ensure Dockerfile.exec and requirements.txt are in the build context
-            # For simplicity, assuming they are in project_root
-            await asyncio.to_thread(
-                self.client.images.build,
-                path=self.project_root,
-                dockerfile=self.dockerfile_path,
-                tag=image_name,
-                rm=True
-            )
+            def build():
+                return self.client.api.build(
+                    path=self.project_root,
+                    dockerfile=self.dockerfile_path,
+                    tag=image_name,
+                    rm=True,
+                    decode=True
+                )
+            logs = await asyncio.to_thread(build)
+            for log in logs:
+                if "stream" in log:
+                    print(f"[Docker Build] {log['stream'].strip()}")
+                elif "error" in log:
+                    print(f"[Docker Build ERROR] {log['error']}")
             logger.info(f"Successfully built Docker image {image_name}")
             return image_name
         except docker.errors.BuildError as e:
