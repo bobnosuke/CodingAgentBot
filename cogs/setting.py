@@ -8,7 +8,7 @@ from discord import app_commands
 from logger import setup_logger
 from modules.database.repository import UserRepository, APIKeyRepository, UsageLogRepository
 from modules.utils.i18n import i18n
-from config.ai_models import model_manager
+from configs.ai_models import model_manager
 import asyncio
 
 logger = setup_logger(__name__)
