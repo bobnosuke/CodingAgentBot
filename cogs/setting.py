@@ -15,7 +15,7 @@ logger = setup_logger(__name__)
 
 
 class SettingView(discord.ui.View):
-"""Persistent View for /setting (Public Panel)"""
+    """Persistent View for /setting (Public Panel)"""
     def __init__(self, bot: commands.Bot):
         super().__init__(timeout=None)
         self.bot = bot
@@ -77,7 +77,7 @@ class SettingView(discord.ui.View):
 
 
 class SettingDetailView(discord.ui.View):
-"""Ephemeral View for detailed settings"""
+    """Ephemeral View for detailed settings"""
     def __init__(self, bot: commands.Bot, lang: str):
         super().__init__(timeout=300)
         self.bot = bot
@@ -272,7 +272,7 @@ class APIKeyDeleteConfirmView(discord.ui.View):
         await interaction.response.edit_message(content=i18n.translate(self.lang, "COMMON.CANCEL"), embed=None, view=None)
 
 class SettingCog(commands.Cog):
-"""Cog for user settings"""
+    """Cog for user settings"""
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
