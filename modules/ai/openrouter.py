@@ -187,6 +187,7 @@ When generating code:
         })
         
         if use_cerebras and self.cerebras_client:
+            print("🔥 Using Cerebras")
             async for chunk in self.cerebras_client.generate_content(
                 messages=messages,
                 temperature=0.7,
