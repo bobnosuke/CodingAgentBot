@@ -35,6 +35,10 @@ class RequirementApprovalView(discord.ui.View):
         
         # Progress notification callback
         async def update_progress(msg, status):
+            print("update_progress開始")
+            print("msg:", msg)
+            print("status:", status)
+        
             emoji = "⚙️"
             if status == "setup": emoji = "🏗️"
             elif status == "generating": emoji = "🧠"
@@ -42,13 +46,22 @@ class RequirementApprovalView(discord.ui.View):
             elif status == "retrying": emoji = "🩹"
             elif status == "success": emoji = "✨"
             elif status == "error": emoji = "❌"
-            
+        
             embed = discord.Embed(
                 title="🚀 自律実装プロセス",
                 description=f"{emoji} **{msg}**",
                 color=discord.Color.blue()
             )
-            await ch.send(content=None, embed=embed, view=None)
+        
+            print("Discord送信前")
+        
+            await ch.send(
+                content=None,
+                embed=embed,
+                view=None
+            )
+        
+            print("Discord送信後")
 
         self.agent.on_progress = update_progress
         
