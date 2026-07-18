@@ -8,45 +8,54 @@ from logger import setup_logger
 logger = setup_logger(__name__)
 
 class DockerExecutor:
-    IMAGE_NAME = "coderagent-exec:latest"
     def __init__(self, project_root: str = "./"):
         self.client = docker.from_env()
         self.project_root = project_root
         self.dockerfile_path = os.path.join(project_root, "Dockerfile.exec")
         self.requirements_path = os.path.join(project_root, "requirements.txt")
         
+    def get_image_name(self, session_id):
+        return f"coderagent-exec:{session_id}"
+        
     def image_exists(self):
+        image_name = self.get_image_name(session_id)
         try:
-            self.client.images.get(self.IMAGE_NAME)
+            self.client.images.get(image_name)
             return True
         except docker.errors.ImageNotFound:
             return False
 
-    async def build_image(self, session_id: str = None) -> str:
-        image_name = self.IMAGE_NAME
+    async def build_image(self, session_id: str) -> str:
+        image_name = self.get_image_name(session_id)  
         try:
-            logger.info(f"Building Docker image {image_name}...")
+            logger.info(
+                f"Building Docker image {image_name}..."
+            )
             def build():
-                return self.client.api.build(
+                return self.client.images.build(
                     path=self.project_root,
                     dockerfile=self.dockerfile_path,
                     tag=image_name,
                     rm=True,
                     decode=True
                 )
-            logs = await asyncio.to_thread(build)
+            image, logs = await asyncio.to_thread(build)
             for log in logs:
                 if "stream" in log:
-                    print(f"[Docker Build] {log['stream'].strip()}")
-                elif "error" in log:
-                    print(f"[Docker Build ERROR] {log['error']}")
-            logger.info(f"Successfully built Docker image {image_name}")
+                    print(
+                        f"[Docker Build:{session_id}] "
+                        f"{log['stream'].strip()}"
+                    )
+            logger.info(
+                f"Successfully built {image_name}"
+            )
             return image_name
-        except docker.errors.BuildError as e:
-            logger.error(f"Docker image build failed: {e}")
-            raise
+    
         except Exception as e:
-            logger.error(f"An unexpected error occurred during Docker image build: {e}")
+            logger.error(
+                f"Build failed: {e}",
+                exc_info=True
+            )
             raise
 
     async def execute_code(
@@ -57,7 +66,7 @@ class DockerExecutor:
         timeout: int = 60
     ) -> Dict[str, Any]:
         
-        image_name = self.IMAGE_NAME
+        image_name = self.get_image_name(session_id)
         container_name = f"coderagent-container-{session_id}"
         session_dir = os.path.join(self.project_root, session_id)
 
@@ -116,11 +125,9 @@ class DockerExecutor:
             logger.error(f"An unexpected error occurred during code execution: {e}")
             raise
         finally:
-            # 3. Clean up session directory
-            if os.path.exists(session_dir):
-                shutil.rmtree(session_dir)
-                logger.info(f"Cleaned up session directory {session_dir}")
-
+            logger.info(
+                f"Keeping project directory: {session_dir}"
+            )
 
 # Example Usage (for testing)
 async def main():
@@ -128,7 +135,7 @@ async def main():
     session_id = "test_session_123"
     
     # Build image once
-    await executor.build_image()
+    await executor.build_image(session_id)
 
     files_to_execute = [
         {"path": "main.py", "content": "print(\"Hello from Docker!\")"}
