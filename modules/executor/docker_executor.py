@@ -61,13 +61,19 @@ class DockerExecutor:
         # 2. Run the container
         try:
             logger.info(f"Running container {container_name} from image {image_name}...")
-            container = self.client.containers.run(
+            container = await asyncio.to_thread(
+                self.client.containers.run,
                 image_name,
                 command=f"python {entrypoint_file}",
                 name=container_name,
-                volumes={os.path.abspath(session_dir): {'bind': '/app', 'mode': 'rw'}},
+                volumes={
+                    os.path.abspath(session_dir): {
+                        'bind': '/app',
+                        'mode': 'rw'
+                    }
+                },
                 detach=True,
-                remove=True # Automatically remove container after exit
+                remove=True
             )
 
             # Wait for container to finish or timeout
