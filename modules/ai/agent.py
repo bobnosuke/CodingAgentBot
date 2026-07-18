@@ -13,51 +13,26 @@ from modules.executor.docker_executor import DockerExecutor
 logger = setup_logger(__name__)
 
 def extract_json(text: str) -> dict:
-    """
-    AIレスポンスからJSONを安全に抽出する
-    """
-
-    # Markdown除去
     text = text.replace("```json", "")
     text = text.replace("```", "")
-
-    # JSON部分抽出
-    decoder = json.JSONDecoder()
-    
     start = text.find("{")
-    
     if start == -1:
         raise ValueError("JSON object not found")
-    
+    json_text = text[start:].strip()
+    decoder = json.JSONDecoder()
+
     try:
-        obj, index = decoder.raw_decode(text[start:])
+        obj, index = decoder.raw_decode(json_text)
         return obj
-    
-    except json.JSONDecodeError as e:
-        raise ValueError(
-            f"Invalid JSON response: {e}"
-        )
-
-    if not match:
-        raise ValueError("JSON object not found")
-
-    json_text = match.group()
-
-    try:
-        return json.loads(json_text)
-
     except json.JSONDecodeError:
-        # 修復候補
-        json_text = json_text.strip()
-
-        # 末尾カンマ除去
-        json_text = re.sub(
-            r',\s*([}\]])',
-            r'\1',
-            json_text
-        )
-
-        return json.loads(json_text)
+        # JSON修復
+        repaired = json_text
+        # 末尾カンマ削除
+        repaired = re.sub(r',\s*([}\]])',r'\1',repaired)
+        try:
+            return json.loads(repaired)
+        except:
+            raise ValueError("AI returned invalid JSON")
 
 class CodingAgent:
     """
@@ -238,7 +213,17 @@ class CodingAgent:
                     result["execution_result"] = exec_result
                     return result
                 else:
-                    logger.warning(f"Verification failed with exit code {exec_result['exit_code']}")
+                    logger.warning(
+f"""
+Docker verification failed
+
+Exit Code:
+{exec_result['exit_code']}
+
+Logs:
+{exec_result['logs']}
+"""
+)
                     await self._notify_progress(f"検証エラーを検出しました。修正を試みます... (試行 {attempt + 1})", "retrying")
                     # Feedback to AI
                     history.append({"role": "assistant", "content": response_text})
