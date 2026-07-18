@@ -36,8 +36,7 @@ class DockerExecutor:
                     path=self.project_root,
                     dockerfile=self.dockerfile_path,
                     tag=image_name,
-                    rm=True,
-                    decode=True
+                    rm=True
                 )
             image, logs = await asyncio.to_thread(build)
             for log in logs:
