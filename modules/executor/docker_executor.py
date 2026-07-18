@@ -1,4 +1,3 @@
-
 import asyncio
 import docker
 import os
@@ -9,14 +8,22 @@ from logger import setup_logger
 logger = setup_logger(__name__)
 
 class DockerExecutor:
+    IMAGE_NAME = "coderagent-exec:latest"
     def __init__(self, project_root: str = "./"):
         self.client = docker.from_env()
         self.project_root = project_root
         self.dockerfile_path = os.path.join(project_root, "Dockerfile.exec")
         self.requirements_path = os.path.join(project_root, "requirements.txt")
+        
+    def image_exists(self):
+        try:
+            self.client.images.get(self.IMAGE_NAME)
+            return True
+        except docker.errors.ImageNotFound:
+            return False
 
-    async def build_image(self, session_id: str) -> str:
-        image_name = f"coderagent-exec:{session_id}"
+    async def build_image(self) -> str:
+        image_name = self.IMAGE_NAME
         try:
             logger.info(f"Building Docker image {image_name}...")
             # Ensure Dockerfile.exec and requirements.txt are in the build context
@@ -45,7 +52,7 @@ class DockerExecutor:
         timeout: int = 60
     ) -> Dict[str, Any]:
         
-        image_name = "coderagent-exec:latest"
+        image_name = self.IMAGE_NAME
         container_name = f"coderagent-container-{session_id}"
         session_dir = os.path.join(self.project_root, session_id)
 
@@ -116,7 +123,7 @@ async def main():
     session_id = "test_session_123"
     
     # Build image once
-    await executor.build_image(session_id)
+    await executor.build_image()
 
     files_to_execute = [
         {"path": "main.py", "content": "print(\"Hello from Docker!\")"}
