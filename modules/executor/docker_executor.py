@@ -79,25 +79,51 @@ class DockerExecutor:
                 f.write(file_data["content"])
         logger.info(f"Wrote {len(files)} files to {session_dir}")
 
+        container = None
         # 2. Run the container
         try:
-            logger.info(f"Running container {container_name} from image {image_name}...")
-            await asyncio.to_thread(container.start)
+            logger.info(
+                f"Creating container {container_name} from image {image_name}..."
+            )
+        
+            container = await asyncio.to_thread(
+                self.client.containers.create,
+                image_name,
+                command=f"python {entrypoint_file}",
+                name=container_name,
+                volumes={
+                    os.path.abspath(session_dir): {
+                        "bind": "/app",
+                        "mode": "rw"
+                    }
+                }
+            )
+        
+            logger.info(
+                f"Starting container {container_name}..."
+            )
+        
+            await asyncio.to_thread(
+                container.start
+            )
+        
             result = await asyncio.to_thread(
                 container.wait,
                 timeout=timeout
             )
+        
             logs = await asyncio.to_thread(
                 container.logs
             )
+        
             logs = logs.decode("utf-8")
+        
             exit_code = result["StatusCode"]
+        
             logger.info(
                 f"Container {container_name} exited with code {exit_code}"
             )
-            await asyncio.to_thread(
-                container.remove
-            )
+        
             return {
                 "exit_code": exit_code,
                 "logs": logs
@@ -114,14 +140,46 @@ class DockerExecutor:
             logger.error(f"Docker API error: {e}")
             raise
         except asyncio.TimeoutError:
-            logger.warning(f"Container {container_name} timed out after {timeout} seconds. Killing...")
-            container.kill()
-            logs = container.logs().decode('utf-8')
-            return {"exit_code": -1, "logs": logs + "\nExecution timed out."}
+            logger.warning(
+                f"Container {container_name} timed out after {timeout} seconds."
+            )
+        
+            logs = ""
+        
+            if container:
+                try:
+                    await asyncio.to_thread(
+                        container.kill
+                    )
+        
+                    logs = await asyncio.to_thread(
+                        container.logs
+                    )
+        
+                    logs = logs.decode("utf-8")
+        
+                except Exception as e:
+                    logs = str(e)
+        
+            return {
+                "exit_code": -1,
+                "logs": logs + "\nExecution timed out."
+            }
         except Exception as e:
             logger.error(f"An unexpected error occurred during code execution: {e}")
             raise
         finally:
+            if container:
+                try:
+                    await asyncio.to_thread(
+                        container.remove,
+                        force=True
+                    )
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to remove container: {e}"
+                    )
+        
             logger.info(
                 f"Keeping project directory: {session_dir}"
             )
