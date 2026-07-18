@@ -22,7 +22,21 @@ def extract_json(text: str) -> dict:
     text = text.replace("```", "")
 
     # JSON部分抽出
-    match = re.search(r'\{[\s\S]*\}', text)
+    decoder = json.JSONDecoder()
+    
+    start = text.find("{")
+    
+    if start == -1:
+        raise ValueError("JSON object not found")
+    
+    try:
+        obj, index = decoder.raw_decode(text[start:])
+        return obj
+    
+    except json.JSONDecodeError as e:
+        raise ValueError(
+            f"Invalid JSON response: {e}"
+        )
 
     if not match:
         raise ValueError("JSON object not found")
