@@ -83,18 +83,31 @@ class DockerExecutor:
         try:
             logger.info(f"Running container {container_name} from image {image_name}...")
             container = await asyncio.to_thread(
-                self.client.containers.run,
+                self.client.containers.create,
                 image_name,
                 command=f"python {entrypoint_file}",
                 name=container_name,
                 volumes={
                     os.path.abspath(session_dir): {
-                        'bind': '/app',
-                        'mode': 'rw'
+                        'bind':'/app',
+                        'mode':'rw'
                     }
-                },
-                detach=True,
-                remove=True
+                }
+            )
+            
+            await asyncio.to_thread(container.start)
+            
+            result = await asyncio.to_thread(
+                container.wait,
+                timeout=timeout
+            )
+            
+            logs = await asyncio.to_thread(
+                container.logs
+            )
+            
+            await asyncio.to_thread(
+                container.remove
             )
 
             # Wait for container to finish or timeout
