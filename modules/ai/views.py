@@ -21,7 +21,7 @@ class RequirementApprovalView(discord.ui.View):
         self.lang = lang
         self.refine_count = 0
         
-    @discord.ui.button(label="Start Implementation", style=discord.ButtonStyle.green, emoji="🚀")
+    @discord.ui.button(label="開発を開始", style=discord.ButtonStyle.green, emoji="🚀")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
         from modules.utils.i18n import i18n
         if str(interaction.user.id) != self.user_id:
@@ -31,10 +31,6 @@ class RequirementApprovalView(discord.ui.View):
         
         # Progress notification callback
         async def update_progress(msg, status):
-            print("update_progress開始")
-            print("msg:", msg)
-            print("status:", status)
-        
             emoji = "⚙️"
             if status == "setup": emoji = "🏗️"
             elif status == "generating": emoji = "🧠"
@@ -109,7 +105,7 @@ class RequirementApprovalView(discord.ui.View):
         embed.add_field(name="Files", value=", ".join([f["path"] for f in result.get("files", [])]), inline=False)
         await interaction.followup.send(embed=embed)
 
-    @discord.ui.button(label="Refine Requirements", style=discord.ButtonStyle.gray, emoji="✏️")
+    @discord.ui.button(label="要件を修正", style=discord.ButtonStyle.gray, emoji="✏️")
     async def refine(self, interaction: discord.Interaction, button: discord.ui.Button):
         from modules.utils.i18n import i18n
         if str(interaction.user.id) != self.user_id:
