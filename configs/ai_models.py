@@ -3,7 +3,7 @@ import os
 from typing import List, Dict
 
 class AIModelManager:
-    def __init__(self, config_path: str = "config/models.json"):
+    def __init__(self, config_path: str = "configs/models.json"):
         self.config_path = config_path
         self.models = self._load_models()
         self.model_status = {}  # {model_name: {"status": "active", "retry_after": 0, "error_count": 0, "success_time": None, "usage_count": 0}}
@@ -12,10 +12,10 @@ class AIModelManager:
         if not os.path.exists(self.config_path):
             # Fallback if file not found
             return {
-                "high_quality": ["qwen/qwen3-coder:free"],
-                "reasoning": ["meta-llama/llama-3.3-70b-instruct:free"],
-                "standard": ["qwen/qwen3-32b:free"],
-                "fast": ["meta-llama/llama-3.1-8b-instruct:free"]
+                "high_quality": ["nvidia/nemotron-3-ultra-550b-a55b:free"],
+                "reasoning": ["openai/gpt-oss-20b:free"],
+                "standard": ["cohere/north-mini-code:free"],
+                "fast": ["nvidia/nemotron-nano-12b-v2-vl:free"]
             }
         with open(self.config_path, "r") as f:
             return json.load(f)
