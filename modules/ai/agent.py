@@ -12,6 +12,38 @@ from modules.executor.docker_executor import DockerExecutor
 
 logger = setup_logger(__name__)
 
+def extract_json(text: str) -> dict:
+    """
+    AIレスポンスからJSONを安全に抽出する
+    """
+
+    # Markdown除去
+    text = text.replace("```json", "")
+    text = text.replace("```", "")
+
+    # JSON部分抽出
+    match = re.search(r'\{[\s\S]*\}', text)
+
+    if not match:
+        raise ValueError("JSON object not found")
+
+    json_text = match.group()
+
+    try:
+        return json.loads(json_text)
+
+    except json.JSONDecodeError:
+        # 修復候補
+        json_text = json_text.strip()
+
+        # 末尾カンマ除去
+        json_text = re.sub(
+            r',\s*([}\]])',
+            r'\1',
+            json_text
+        )
+
+        return json.loads(json_text)
 
 class CodingAgent:
     """
@@ -54,12 +86,7 @@ class CodingAgent:
             ):
                 response_text += chunk
             
-            # Extract JSON from response
-            json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-            if json_match:
-                return json.loads(json_match.group())
-            else:
-                return {"error": "Failed to parse requirements JSON", "raw_response": response_text}
+            return extract_json(response_text)
         except Exception as e:
             logger.error(f"Error in define_requirements: {e}")
             return {"error": str(e)}
@@ -130,15 +157,7 @@ class CodingAgent:
                 ):
                     response_text += chunk
                 
-                # Extract JSON from response
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if not json_match:
-                    error_msg = "Failed to parse implementation JSON"
-                    logger.warning(error_msg)
-                    user_msg = f"エラーが発生しました: JSON形式で出力してください。詳細: {error_msg}"
-                    continue
-
-                result = json.loads(json_match.group())
+                result = extract_json(response_text)
                 tool_calls = result.get("tool_calls", [])
                 entrypoint = result.get("entrypoint")
 
@@ -183,6 +202,10 @@ class CodingAgent:
 以下のログを確認し、原因を特定してコードを修正してください。
 
 ### 実行ログ:
+生成した前回コード:
+{response_text}
+
+Dockerログ:
 {exec_result['logs']}
 
 ### 修正のポイント:
