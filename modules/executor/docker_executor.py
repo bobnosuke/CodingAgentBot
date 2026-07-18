@@ -65,124 +65,67 @@ class DockerExecutor:
         entrypoint_file: str,
         timeout: int = 60
     ) -> Dict[str, Any]:
-        
+    
         image_name = self.get_image_name(session_id)
         container_name = f"coderagent-container-{session_id}"
-        session_dir = os.path.join(self.project_root, session_id)
-
-        # 1. Create session directory and write files
-        os.makedirs(session_dir, exist_ok=True)
+        session_dir = os.path.join(self.project_root,session_id)
+        os.makedirs(session_dir,exist_ok=True)
+    
+        # ファイル書き込み
         for file_data in files:
-            file_path = os.path.join(session_dir, file_data["path"])
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, "w", encoding="utf-8") as f:
+            file_path = os.path.join(session_dir,file_data["path"])
+            directory = os.path.dirname(file_path)
+    
+            if directory:
+                os.makedirs(directory,exist_ok=True)
+            with open(file_path,"w",encoding="utf-8") as f:
                 f.write(file_data["content"])
         logger.info(f"Wrote {len(files)} files to {session_dir}")
-
-        container = None
-        # 2. Run the container
-        try:
-            logger.info(
-                f"Creating container {container_name} from image {image_name}..."
-            )
         
+        container = None
+        try:
+            logger.info(f"Creating container {container_name}")
             container = await asyncio.to_thread(
                 self.client.containers.create,
                 image_name,
-                command=f"python {entrypoint_file}",
+                command=[
+                    "python",
+                    entrypoint_file
+                ],
                 name=container_name,
                 volumes={
-                    os.path.abspath(session_dir): {
-                        "bind": "/app",
-                        "mode": "rw"
+                    os.path.abspath(session_dir):
+                    {
+                        "bind":"/app",
+                        "mode":"rw"
                     }
                 }
             )
-        
-            logger.info(
-                f"Starting container {container_name}..."
-            )
-        
-            await asyncio.to_thread(
-                container.start
-            )
-        
-            result = await asyncio.to_thread(
-                container.wait,
-                timeout=timeout
-            )
-        
-            logs = await asyncio.to_thread(
-                container.logs
-            )
-        
-            logs = logs.decode("utf-8")
-        
+    
+            logger.info("Starting container...")
+            await asyncio.to_thread(container.start)
+            result = await asyncio.to_thread(container.wait,timeout=timeout)
+            logs = await asyncio.to_thread(container.logs)
+            logs = logs.decode("utf-8",errors="ignore")
             exit_code = result["StatusCode"]
-        
-            logger.info(
-                f"Container {container_name} exited with code {exit_code}"
-            )
-        
-            return {
-                "exit_code": exit_code,
-                "logs": logs
-            }
-
-        except docker.errors.ContainerError as e:
-            logs = e.container.logs().decode('utf-8')
-            logger.error(f"Container error: {e}\nLogs: {logs}")
-            return {"exit_code": e.exit_status, "logs": logs}
-        except docker.errors.ImageNotFound:
-            logger.error(f"Docker image {image_name} not found. Please build it first.")
-            raise
-        except docker.errors.APIError as e:
-            logger.error(f"Docker API error: {e}")
-            raise
-        except asyncio.TimeoutError:
-            logger.warning(
-                f"Container {container_name} timed out after {timeout} seconds."
-            )
-        
-            logs = ""
-        
+            return {"exit_code": exit_code,"logs": logs}
+        except Exception as e:
+            logger.error(f"Docker execution error: {e}",exc_info=True)
             if container:
                 try:
-                    await asyncio.to_thread(
-                        container.kill
-                    )
-        
-                    logs = await asyncio.to_thread(
-                        container.logs
-                    )
-        
-                    logs = logs.decode("utf-8")
-        
-                except Exception as e:
+                    logs = container.logs().decode("utf-8",errors="ignore")
+                except:
                     logs = str(e)
-        
-            return {
-                "exit_code": -1,
-                "logs": logs + "\nExecution timed out."
-            }
-        except Exception as e:
-            logger.error(f"An unexpected error occurred during code execution: {e}")
-            raise
+            else:
+                logs = str(e)
+            return {"exit_code": -1,"logs": logs}
         finally:
             if container:
                 try:
-                    await asyncio.to_thread(
-                        container.remove,
-                        force=True
-                    )
-                except Exception as e:
-                    logger.warning(
-                        f"Failed to remove container: {e}"
-                    )
-        
-            logger.info(
-                f"Keeping project directory: {session_dir}"
-            )
+                    await asyncio.to_thread(container.remove,force=True)
+                except:
+                    pass
+            logger.info(f"Keeping project directory: {session_dir}")
 
 # Example Usage (for testing)
 async def main():
