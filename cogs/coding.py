@@ -202,7 +202,7 @@ class CodingPanelView(discord.ui.View):
                         task_data.get("assigned_to")
                     )
                 await RequirementRepository.update_requirement(db_session, latest_requirement.id, status="planned")
-                logger.info(f"Planned {len(planned_tasks.get(\'tasks\', []))} tasks for requirement {latest_requirement.id}")
+                logger.info(f"Planned {len(planned_tasks.get('tasks', []))} tasks for requirement {latest_requirement.id}")
             else:
                 logger.warning(f"No latest requirement found for session {db_session_id}")
             
@@ -275,7 +275,10 @@ class CodingCog(commands.Cog):
         self.bot = bot
         self.session_manager = SessionManager(bot)
         self.project_manager = WorkspaceManager()
-        self.planner_agent = PlannerAgent(AIService(api_key="dummy", base_url=Config.OPENROUTER_API_BASE)) # Initialize PlannerAgent
+        openrouter_client = OpenRouterClient(api_key=Config.OPENROUTER_API_KEY, base_url=Config.OPENROUTER_BASE_URL)
+        cerebras_client = CerebrasClient(api_key=Config.CEREBRAS_API_KEY) if Config.CEREBRAS_API_KEY else None
+        ai_service = AIService(openrouter_client=openrouter_client, cerebras_client=cerebras_client)
+        self.planner_agent = PlannerAgent(ai_service) # Initialize PlannerAgent
         self.task_repository = TaskRepository()
 
     async def _get_user_lang_from_message(self, message: discord.Message):

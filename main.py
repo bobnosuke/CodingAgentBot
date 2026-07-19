@@ -44,7 +44,7 @@ class CoderAgent(commands.Bot):
         logger.info("✅ Command translator registered")
         
         # Load Cogs
-        for filename in os.listdir("./cogs"):
+        for filename in os.listdir(os.path.join(os.path.dirname(__file__), "cogs")):
             if filename.endswith(".py") and not filename.startswith("__"):
                 try:
                     await self.load_extension(f"cogs.{filename[:-3]}")

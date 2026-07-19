@@ -443,41 +443,25 @@ class RequirementRepository:
         """Get requirement by ID"""
         try:
             return await session.get(Requirement, requirement_id)
-
-    @staticmethod
-    async def update_requirement(session: AsyncSession, requirement_id: int, status: Optional[str] = None, json_data: Optional[dict] = None) -> None:
-        """Update requirement status or JSON data"""
-        try:
-            values = {}
-            if status:
-                values["status"] = status
-            if json_data:
-                values["json_data"] = json_data
-            if values:
-                stmt = update(Requirement).where(Requirement.id == requirement_id).values(**values)
-                await session.execute(stmt)
-                await session.commit()
         except Exception as e:
-            logger.error(f"Error in update_requirement: {e}")
-            await session.rollback()
+            logger.error(f"Error in get_requirement: {e}")
             raise
-
 
     @staticmethod
     async def update_requirement(
         session: AsyncSession,
         requirement_id: int,
-        json_data: dict = None,
-        status: str = None
+        status: Optional[str] = None,
+        json_data: Optional[dict] = None
     ) -> Optional[Requirement]:
-        """Update requirement data or status"""
+        """Update requirement status or JSON data"""
         try:
             requirement = await session.get(Requirement, requirement_id)
             if requirement:
-                if json_data is not None:
-                    requirement.json_data = json_data
                 if status is not None:
                     requirement.status = status
+                if json_data is not None:
+                    requirement.json_data = json_data
                 requirement.updated_at = datetime.utcnow()
                 await session.commit()
                 return requirement

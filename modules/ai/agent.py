@@ -55,8 +55,10 @@ class CodingAgent:
     Phase 2: One-shot Implementation (Optimized for High-performance models)
     """
     
-    def __init__(self, ai_service: AIService, executor: Optional[DockerExecutor] = None, verifier: Optional[Verifier] = None, on_progress: Optional[callable] = None, base_path: str = "./storage"):
+    def __init__(self, ai_service: AIService, db_manager: Any, bot: Any, executor: Optional[DockerExecutor] = None, verifier: Optional[Verifier] = None, on_progress: Optional[callable] = None, base_path: str = "./storage"):
         self.ai_service = ai_service
+        self.db_manager = db_manager
+        self.bot = bot
         self.executor = executor or DockerExecutor()
         self.verifier = verifier or Verifier()
         self.tools = AgentTools(base_path)
