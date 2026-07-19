@@ -90,6 +90,7 @@ class Session(Base):
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="session", cascade="all, delete-orphan")
     requirements = relationship("Requirement", back_populates="session", cascade="all, delete-orphan")
+    tasks = relationship("Task", back_populates="session", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime, default=utc_now)
@@ -208,10 +209,39 @@ class Requirement(Base):
     
     # Relationship
     session = relationship("Session", back_populates="requirements")
+    tasks = relationship("Task", back_populates="requirement", cascade="all, delete-orphan")
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
     
     def __repr__(self):
         return f"<Requirement {self.id} for Session {self.session_id} (Status: {self.status})>"
+
+
+class Task(Base):
+    """Task model - stores planned tasks for agents"""
+    __tablename__ = "tasks"
+
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    requirement_id = Column(Integer, ForeignKey("requirements.id"), nullable=False, index=True)
+
+    task_id = Column(Integer, nullable=False) # Unique ID within a requirement
+    type = Column(String(50), nullable=False) # e.g., "create_project_structure", "create_flask_app", "execute_test"
+    role = Column(String(50), nullable=False) # e.g., "coder", "executor", "debugger"
+    status = Column(String(50), default="pending") # "pending", "in_progress", "completed", "failed"
+    description = Column(Text, nullable=True)
+    assigned_to = Column(String(50), nullable=True) # Which agent is assigned
+    result = Column(JSON, nullable=True)
+
+    # Relationships
+    session = relationship("Session", back_populates="tasks")
+    requirement = relationship("Requirement", back_populates="tasks")
+
+    # Timestamps
+    created_at = Column(DateTime, default=utc_now)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)
+
+    def __repr__(self):
+        return f"<Task {self.task_id} ({self.type}) for Requirement {self.requirement_id} (Status: {self.status})>"
