@@ -30,7 +30,22 @@ def extract_json(text: str) -> dict:
         # JSON修復
         repaired = json_text
         # 末尾カンマ削除
-        repaired = re.sub(r
+        repaired = re.sub(r',\s*([}\]])', r'\1', repaired)
+        # 複数行コメントの削除
+        repaired = re.sub(r'/\*.*?\*/', '', repaired, flags=re.DOTALL)
+        # 単一行コメントの削除
+        repaired = re.sub(r'//.*', '', repaired)
+        # キーが引用符で囲まれていない場合の修正
+        repaired = re.sub(r'([{,])\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*:', r'\1"\2":', repaired)
+        # 末尾に余分な文字がある場合の削除
+        repaired = repaired.split('}')[0] + '}' # 最初の閉じ括弧以降を削除
+        repaired = repaired.split(']')[0] + ']' # 最初の閉じ角括弧以降を削除
+
+        try:
+            obj = json.loads(repaired)
+            return obj
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Failed to repair JSON: {e}\nOriginal: {json_text}\nRepaired: {repaired}") from e
 
 
 class CodingAgent:
