@@ -419,12 +419,14 @@ class RequirementRepository:
     async def create_requirement(
         session: AsyncSession,
         session_id: int,
+        user_id: int,
         json_data: dict
     ) -> Requirement:
         """Create a new requirement entry"""
         try:
             requirement = Requirement(
                 session_id=session_id,
+                user_id=user_id,
                 json_data=json_data,
                 status="pending"
             )
@@ -510,6 +512,7 @@ class TaskRepository:
     async def create_task(
         session: AsyncSession,
         session_id: int,
+        user_id: int,
         requirement_id: int,
         task_id: int,
         type: str,
@@ -521,6 +524,7 @@ class TaskRepository:
         try:
             task = Task(
                 session_id=session_id,
+                user_id=user_id,
                 requirement_id=requirement_id,
                 task_id=task_id,
                 type=type,

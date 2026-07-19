@@ -203,6 +203,7 @@ class Requirement(Base):
     
     id = Column(Integer, primary_key=True)
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     
     # Requirement data
     json_data = Column(JSON, nullable=False)
@@ -210,6 +211,7 @@ class Requirement(Base):
     
     # Relationship
     session = relationship("Session", back_populates="requirements")
+    user = relationship("User", back_populates="requirements")
     tasks = relationship("Task", back_populates="requirement", cascade="all, delete-orphan")
     
     # Timestamps
@@ -226,6 +228,7 @@ class Task(Base):
 
     id = Column(Integer, primary_key=True)
     session_id = Column(Integer, ForeignKey("sessions.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     requirement_id = Column(Integer, ForeignKey("requirements.id"), nullable=False, index=True)
 
     task_id = Column(Integer, nullable=False) # Unique ID within a requirement
@@ -238,6 +241,7 @@ class Task(Base):
 
     # Relationships
     session = relationship("Session", back_populates="tasks")
+    user = relationship("User", back_populates="tasks")
     requirement = relationship("Requirement", back_populates="tasks")
 
     # Timestamps

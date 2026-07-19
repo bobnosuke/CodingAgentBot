@@ -183,7 +183,15 @@ class CodingPanelView(discord.ui.View):
             )
 
             # Fetch the latest requirement for this session
-            latest_requirement = await RequirementRepository.get_latest_requirement_by_session(db_session, db_session_id)
+            # Create a dummy requirement for now, this will be replaced by actual requirement from Gemini
+            # For now, we need a requirement_id to create tasks
+            dummy_requirement = await RequirementRepository.create_requirement(
+                db_session,
+                db_session_id,
+                user.id,
+                {"task_summary": "Initial setup", "technical_requirements": []}
+            )
+            latest_requirement = dummy_requirement
 
             if latest_requirement:
                 # Generate tasks using PlannerAgent
@@ -192,10 +200,11 @@ class CodingPanelView(discord.ui.View):
                 # Persist tasks to the database
                 for i, task_data in enumerate(planned_tasks.get("tasks", [])):
                     await self.task_repository.create_task(
-                        db_session,
-                        db_session_id,
-                        latest_requirement.id,
-                        i + 1, # task_id
+                db_session,
+                db_session_id,
+                latest_requirement.id,
+                i + 1, # task_id
+                user.id,
                         task_data.get("type"),
                         task_data.get("role"),
                         task_data.get("description"),
