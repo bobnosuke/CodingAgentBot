@@ -31,6 +31,7 @@ class User(Base):
     api_keys = relationship("APIKey", back_populates="user", cascade="all, delete-orphan")
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
+    requirements = relationship("Requirement", back_populates="user", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime, default=utc_now)

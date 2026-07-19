@@ -6,7 +6,7 @@ from typing import Optional, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, delete, func
 from logger import setup_logger
-from .models import User, APIKey, Session, Message, Project, UsageLog, SystemLog, Requirement
+from .models import User, APIKey, Session, Message, Project, UsageLog, SystemLog, Requirement, Task
 from datetime import datetime, time
 
 logger = setup_logger(__name__)
@@ -443,9 +443,25 @@ class RequirementRepository:
         """Get requirement by ID"""
         try:
             return await session.get(Requirement, requirement_id)
+
+    @staticmethod
+    async def update_requirement(session: AsyncSession, requirement_id: int, status: Optional[str] = None, json_data: Optional[dict] = None) -> None:
+        """Update requirement status or JSON data"""
+        try:
+            values = {}
+            if status:
+                values["status"] = status
+            if json_data:
+                values["json_data"] = json_data
+            if values:
+                stmt = update(Requirement).where(Requirement.id == requirement_id).values(**values)
+                await session.execute(stmt)
+                await session.commit()
         except Exception as e:
-            logger.error(f"Error in get_requirement: {e}")
+            logger.error(f"Error in update_requirement: {e}")
+            await session.rollback()
             raise
+
 
     @staticmethod
     async def update_requirement(
@@ -500,4 +516,92 @@ class RequirementRepository:
             return result.scalar_one_or_none()
         except Exception as e:
             logger.error(f"Error in get_latest_requirement_by_session: {e}")
+            raise
+
+
+class TaskRepository:
+    """Repository for Task operations"""
+
+    @staticmethod
+    async def create_task(
+        session: AsyncSession,
+        session_id: int,
+        requirement_id: int,
+        task_id: int,
+        type: str,
+        role: str,
+        description: Optional[str] = None,
+        assigned_to: Optional[str] = None
+    ) -> Task:
+        """Create a new task entry"""
+        try:
+            task = Task(
+                session_id=session_id,
+                requirement_id=requirement_id,
+                task_id=task_id,
+                type=type,
+                role=role,
+                description=description,
+                assigned_to=assigned_to,
+                status="pending"
+            )
+            session.add(task)
+            await session.commit()
+            logger.info(f"Created task {task_id} for requirement {requirement_id}")
+            return task
+        except Exception as e:
+            logger.error(f"Error in create_task: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_task(session: AsyncSession, task_db_id: int) -> Optional[Task]:
+        """Get task by database ID"""
+        try:
+            stmt = select(Task).where(Task.id == task_db_id)
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error in get_task: {e}")
+            raise
+
+    @staticmethod
+    async def get_tasks_by_requirement(session: AsyncSession, requirement_id: int) -> List[Task]:
+        """Get all tasks for a given requirement"""
+        try:
+            stmt = select(Task).where(Task.requirement_id == requirement_id).order_by(Task.task_id)
+            result = await session.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(f"Error in get_tasks_by_requirement: {e}")
+            raise
+
+    @staticmethod
+    async def update_task_status(session: AsyncSession, task_db_id: int, status: str, result: Optional[dict] = None) -> None:
+        """Update task status and optionally add result"""
+        try:
+            values = {"status": status}
+            if result is not None:
+                values["result"] = result
+            stmt = update(Task).where(Task.id == task_db_id).values(**values)
+            await session.execute(stmt)
+            await session.commit()
+        except Exception as e:
+            logger.error(f"Error in update_task_status: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_next_pending_task(session: AsyncSession, requirement_id: int) -> Optional[Task]:
+        """Get the next pending task for a requirement"""
+        try:
+            stmt = select(Task).where(
+                (Task.requirement_id == requirement_id) &
+                (Task.status == "pending")
+            ).order_by(Task.task_id).limit(1)
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error in get_next_pending_task: {e}")
+            await session.rollback()
             raise

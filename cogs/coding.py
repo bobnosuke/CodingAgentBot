@@ -6,13 +6,14 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from logger import setup_logger
-from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository, UsageLogRepository
+from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository, UsageLogRepository, TaskRepository
 from modules.session.manager import SessionManager
 from modules.ai.openrouter import OpenRouterClient, AIService, CerebrasClient
 from config import Config
 import json
 from modules.utils.i18n import i18n
 from modules.workspace.manager import WorkspaceManager
+from modules.planner.planner import PlannerAgent
 import asyncio
 
 logger = setup_logger(__name__)
@@ -174,12 +175,36 @@ class CodingPanelView(discord.ui.View):
             short_uuid = str(uuid.uuid4())[:8]
             channel_name = f"session-{short_uuid}"
             
-            session_uuid, coding_room = await self.session_manager.create_session(
+            session_uuid, coding_room, db_session_id = await self.session_manager.create_session(
                 db_session, 
                 interaction.user, 
                 interaction.guild, 
                 project_name=channel_name
             )
+
+            # Fetch the latest requirement for this session
+            latest_requirement = await RequirementRepository.get_latest_requirement_by_session(db_session, db_session_id)
+
+            if latest_requirement:
+                # Generate tasks using PlannerAgent
+                planned_tasks = await self.planner_agent.plan_task(latest_requirement.json_data)
+
+                # Persist tasks to the database
+                for i, task_data in enumerate(planned_tasks.get("tasks", [])):
+                    await self.task_repository.create_task(
+                        db_session,
+                        db_session_id,
+                        latest_requirement.id,
+                        i + 1, # task_id
+                        task_data.get("type"),
+                        task_data.get("role"),
+                        task_data.get("description"),
+                        task_data.get("assigned_to")
+                    )
+                await RequirementRepository.update_requirement(db_session, latest_requirement.id, status="planned")
+                logger.info(f"Planned {len(planned_tasks.get(\'tasks\', []))} tasks for requirement {latest_requirement.id}")
+            else:
+                logger.warning(f"No latest requirement found for session {db_session_id}")
             
             embed = discord.Embed(
                 title=i18n.translate(lang, "CODING.SESSION_START_TITLE"),
@@ -201,6 +226,9 @@ class CodingPanelView(discord.ui.View):
             welcome_embed.add_field(name="Tips", value=i18n.translate(lang, "CODING.WELCOME_TIPS"), inline=False)
             welcome_embed.set_footer(text="Made by RovaexTeam")
             await coding_room.send(embed=welcome_embed)
+
+            # Start processing tasks
+            # TODO: Implement task processing logic here
         except Exception as e:
             logger.error(f"Error in _handle_start: {e}", exc_info=True)
             await interaction.followup.send(i18n.translate(lang, "COMMON.ERROR", error=str(e)), ephemeral=True)
@@ -246,7 +274,9 @@ class CodingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.session_manager = SessionManager(bot)
-        self.project_manager = WorkspaceManager() # Add ProjectManager initialization
+        self.project_manager = WorkspaceManager()
+        self.planner_agent = PlannerAgent(AIService(api_key="dummy", base_url=Config.OPENROUTER_API_BASE)) # Initialize PlannerAgent
+        self.task_repository = TaskRepository()
 
     async def _get_user_lang_from_message(self, message: discord.Message):
         db_session = self.bot.db_manager.get_session()
