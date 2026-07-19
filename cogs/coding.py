@@ -12,7 +12,7 @@ from modules.ai.openrouter import OpenRouterClient, AIService, CerebrasClient
 from config import Config
 import json
 from modules.utils.i18n import i18n
-from modules.project.manager import ProjectManager
+from modules.workspace.manager import WorkspaceManager
 import asyncio
 
 logger = setup_logger(__name__)
@@ -110,7 +110,7 @@ class CodingPanelView(discord.ui.View):
         super().__init__(timeout=None)
         self.bot = bot
         self.session_manager = SessionManager(bot)
-        self.project_manager = ProjectManager()
+        self.project_manager = WorkspaceManager()
     
     async def _get_user_lang(self, interaction: discord.Interaction):
         db_session = self.bot.db_manager.get_session()
@@ -246,7 +246,7 @@ class CodingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.session_manager = SessionManager(bot)
-        self.project_manager = ProjectManager() # Add ProjectManager initialization
+        self.project_manager = WorkspaceManager() # Add ProjectManager initialization
 
     async def _get_user_lang_from_message(self, message: discord.Message):
         db_session = self.bot.db_manager.get_session()

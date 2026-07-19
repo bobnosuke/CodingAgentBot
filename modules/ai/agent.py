@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional, AsyncGenerator
 from logger import setup_logger
 from .openrouter import AIService
 from modules.executor.docker_executor import DockerExecutor
+from modules.verifier.verifier import Verifier
 
 logger = setup_logger(__name__)
 
@@ -19,24 +20,25 @@ class CodingAgent:
     Phase 2: One-shot Implementation (Optimized for High-performance models)
     """
     
-    def __init__(self, ai_service: AIService, executor: Optional[DockerExecutor] = None, on_progress: Optional[callable] = None):
+    def __init__(self, ai_service: AIService, executor: Optional[DockerExecutor] = None, verifier: Optional[Verifier] = None, on_progress: Optional[callable] = None):
         self.ai_service = ai_service
         self.executor = executor or DockerExecutor()
+        self.verifier = verifier or Verifier()
         self.max_retries = 3
         self.on_progress = on_progress
 
     async def _notify_progress(self, message, status):
-        print("_notify_progress開始")
+        logger.debug("_notify_progress開始")
     
         if self.on_progress:
-            print("callbackあり")
+            logger.debug("callbackあり")
     
             if asyncio.iscoroutinefunction(self.on_progress):
-                print("callback await前")
+                logger.debug("callback await前")
     
                 await self.on_progress(message, status)
     
-                print("callback await後")
+                logger.debug("callback await後")
 
     async def define_requirements(self, user_request: str, history: list = []) -> dict:
         """
@@ -72,9 +74,9 @@ class CodingAgent:
         """
         Phase 2: Execute implementation with self-correction loop.
         """
-        print("execute_task開始")
+        logger.debug("execute_task開始")
         await self._notify_progress("環境のセットアップを開始します...", "setup")
-        print("notify_progress完了")
+        logger.debug("notify_progress完了")
         system_prompt = """あなたはエキスパート自律コーディングエージェントです。
 提供された技術仕様（JSON）に基づき、完動するコードを実装してください。
 
@@ -104,7 +106,7 @@ class CodingAgent:
         # Build image once for this session
         try:
             await self.executor.build_image(session_id)
-            print("docker build完了")
+            logger.debug("docker build完了")
             await self._notify_progress("実行環境の準備が完了しました。", "setup_complete")
         except Exception as e:
             logger.error(f"Failed to build Docker image: {e}")
@@ -148,21 +150,29 @@ class CodingAgent:
                 await self._notify_progress("Dockerコンテナ内でコードを検証中...", "verifying")
                 exec_result = await self.executor.execute_code(session_id, files, entrypoint)
                 
-                if exec_result["exit_code"] == 0:
+                verification_result = self.verifier.verify_docker_output(exec_result["exit_code"], exec_result["stdout"], exec_result["stderr"])
+
+                if verification_result["success"]:
                     logger.info("Verification successful!")
                     await self._notify_progress("検証に成功しました！", "success")
                     result["execution_result"] = exec_result
                     return result
                 else:
-                    logger.warning(f"Verification failed with exit code {exec_result['exit_code']}")
+                    logger.warning(f"Verification failed: {verification_result.get("message", "Unknown error")}")
                     await self._notify_progress(f"検証エラーを検出しました。修正を試みます... (試行 {attempt + 1})", "retrying")
                     # Feedback to AI
                     history.append({"role": "assistant", "content": response_text})
-                    user_msg = f"""実装されたコードの実行中にエラーが発生しました。
-以下のログを確認し、原因を特定してコードを修正してください。
+                    error_feedback = f"""実装されたコードの実行中にエラーが発生しました。
+以下のエラー情報を確認し、原因を特定してコードを修正してください。
+
+### エラー詳細:
+タイプ: {verification_result.get("error_type", "不明")}
+ファイル: {verification_result.get("file", "不明")}
+行: {verification_result.get("line", "不明")}
+メッセージ: {verification_result.get("message", "不明")}
 
 ### 実行ログ:
-{exec_result['logs']}
+{exec_result["logs"]}
 
 ### 修正のポイント:
 1. インポートミスや構文エラーがないか
@@ -170,7 +180,8 @@ class CodingAgent:
 3. ロジックに矛盾がないか
 
 再度、全ファイルのコードをJSON形式で出力してください。"""
-                print("AI呼び出し終了")
+                    user_msg = error_feedback
+                logger.debug("AI呼び出し終了")
                     
             except Exception as e:
                 logger.error(f"Error in execute_task attempt {attempt + 1}: {e}")

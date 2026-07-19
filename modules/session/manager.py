@@ -9,7 +9,7 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from logger import setup_logger
 from ..database.repository import SessionRepository, UserRepository
-from modules.project.manager import ProjectManager
+from modules.workspace.manager import WorkspaceManager
 
 logger = setup_logger(__name__)
 
@@ -26,7 +26,7 @@ class SessionManager:
         """
         self.bot = bot
         self.active_sessions = {}  # In-memory cache for active sessions
-        self.project_manager = ProjectManager() # Initialize ProjectManager
+        self.project_manager = WorkspaceManager() # Initialize WorkspaceManager
     
     async def create_session(
         self,
@@ -81,8 +81,7 @@ class SessionManager:
             )
 
             # Create a project for the session
-            from modules.project.manager import ProjectManager
-            project_manager = ProjectManager()
+            project_manager = WorkspaceManager()
             await project_manager.create_project(
                 user.id,
                 project_name or default_name,
