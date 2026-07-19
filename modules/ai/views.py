@@ -21,17 +21,13 @@ class RequirementApprovalView(discord.ui.View):
         self.lang = lang
         self.refine_count = 0
         
-    @discord.ui.button(label="Start Implementation", style=discord.ButtonStyle.green, emoji="🚀")
+    @discord.ui.button(label="開発を開始", style=discord.ButtonStyle.green, emoji="🚀")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
-        print("approve called")
         from modules.utils.i18n import i18n
-        print("モジュールインポート完了")
         if str(interaction.user.id) != self.user_id:
             return await interaction.response.send_message(i18n.translate(self.lang, "COMMON.PERMISSION_DENIED"), ephemeral=True)
             
-        await interaction.response.send_message("コードを生成しています。しばらくお待ちください。")
-        print("メッセージ送信完了")
-        ch=interaction.channel
+        await interaction.response.defer()
         
         # Progress notification callback
         async def update_progress(msg, status):
@@ -42,39 +38,36 @@ class RequirementApprovalView(discord.ui.View):
             elif status == "retrying": emoji = "🩹"
             elif status == "success": emoji = "✨"
             elif status == "error": emoji = "❌"
-            
+        
             embed = discord.Embed(
                 title="🚀 自律実装プロセス",
                 description=f"{emoji} **{msg}**",
                 color=discord.Color.blue()
             )
-            await ch.send(content=None, embed=embed, view=None)
+            await interaction.edit_original_response(
+                content=None,
+                embed=embed,
+                view=None
+            )
 
         self.agent.on_progress = update_progress
-        
         db = interaction.client.db_manager.get_session()
-
         try:
             requirement = await RequirementRepository.get_requirement(
                 db,
                 self.requirement_id
             )
-            print("要件データ取得完了")
         
             if not requirement:
                 return await interaction.followup.send(
                     "❌ 要件データが見つかりませんでした。",
                     ephemeral=True
                 )
-                
-            print("approve_requirement start")
         
             await RequirementRepository.approve_requirement(
                 db,
                 self.requirement_id
             )
-            
-            print("approve_requirement end")
         
             requirement_json = requirement.json_data
         
@@ -87,7 +80,6 @@ class RequirementApprovalView(discord.ui.View):
                 requirement_json,
                 session_id=session_id
             )
-            print("リザルト取得完了")
         
             if "error" in result:
                 return await interaction.followup.send(
@@ -103,7 +95,6 @@ class RequirementApprovalView(discord.ui.View):
                 self.requirement_id,
                 status="completed"
             )
-            print("要件アップデート完了")
         
         finally:
             await db.close()
@@ -114,7 +105,7 @@ class RequirementApprovalView(discord.ui.View):
         embed.add_field(name="Files", value=", ".join([f["path"] for f in result.get("files", [])]), inline=False)
         await interaction.followup.send(embed=embed)
 
-    @discord.ui.button(label="Refine Requirements", style=discord.ButtonStyle.gray, emoji="✏️")
+    @discord.ui.button(label="要件を修正", style=discord.ButtonStyle.gray, emoji="✏️")
     async def refine(self, interaction: discord.Interaction, button: discord.ui.Button):
         from modules.utils.i18n import i18n
         if str(interaction.user.id) != self.user_id:

@@ -25,7 +25,7 @@ class CerebrasClient:
         max_tokens=2000
     ):
         response = await self.client.chat.completions.create(
-            model="llama3.3-70b",
+            model="gpt-oss-120b",
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -131,22 +131,25 @@ class AIService:
         """
         self.openrouter_client = openrouter_client
         self.cerebras_client = cerebras_client
-        self.current_model = "meta-llama/llama-3.3-70b-instruct:free"
+        from configs.ai_models import model_manager
+        self.model_manager = model_manager
+        self.current_quality = "standard"
     
-    def set_model_by_preset(self, preset: str):
+    def set_quality(self, quality: str):
         """
-        Set AI model based on preset name (All Free Models)
+        Set AI quality level
         
         Args:
-            preset: Preset name ('high', 'balance', 'low')
+            quality: Quality level ('high_quality', 'standard', 'fast')
         """
-        presets = {
-            "high": "nousresearch/hermes-3-llama-3.1-405b:free",
-            "balance": "meta-llama/llama-3.3-70b-instruct:free",
-            "low": "qwen/qwen3-coder:free"
-        }
-        self.current_model = presets.get(preset, "meta-llama/llama-3.3-70b-instruct:free")
-        logger.info(f"AI model set to {self.current_model} via preset {preset}")
+        if quality in ["high_quality", "standard", "fast"]:
+            self.current_quality = quality
+        else:
+            self.current_quality = "standard"
+        logger.info(f"AI quality set to {self.current_quality}")
+
+    def get_current_model(self) -> str:
+        return self.model_manager.get_next_available_model(self.current_quality)
 
     async def generate_code(
         self,
@@ -187,21 +190,39 @@ When generating code:
         })
         
         if use_cerebras and self.cerebras_client:
+            print("🔥 Using Cerebras")
             async for chunk in self.cerebras_client.generate_content(
                 messages=messages,
                 temperature=0.7,
                 max_tokens=2000
             ):
                 yield chunk
-        else:
-            async for chunk in self.openrouter_client.create_message(
-                messages=messages,
-                model=model or self.current_model,
-                temperature=0.7,
-                max_tokens=4000,
-                stream=True
-            ):
-                yield chunk
+            return
+
+        # Fallback logic
+        excluded_models = []
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            target_model = model or self.model_manager.get_next_available_model(self.current_quality, excluded_models)
+            try:
+                async for chunk in self.openrouter_client.create_message(
+                    messages=messages,
+                    model=target_model,
+                    temperature=0.7,
+                    max_tokens=4000,
+                    stream=True
+                ):
+                    yield chunk
+                # If successful, update status and return
+                self.model_manager.update_model_status(target_model, "active")
+                return
+            except Exception as e:
+                logger.warning(f"Model {target_model} failed (attempt {attempt + 1}/{max_attempts}): {e}")
+                if "429" in str(e) or "503" in str(e) or "Rate limit" in str(e):
+                    self.model_manager.update_model_status(target_model, "cooldown", retry_after=120)
+                excluded_models.append(target_model)
+                if attempt == max_attempts - 1:
+                    raise Exception("All AI models failed or busy.")
     
     async def chat(
         self,
@@ -245,12 +266,28 @@ Be concise, clear, and practical in your responses."""
                 max_tokens=2000
             ):
                 yield chunk
-        else:
-            async for chunk in self.openrouter_client.create_message(
-                messages=messages,
-                model=model or self.current_model,
-                temperature=0.7,
-                max_tokens=2000,
-                stream=True
-            ):
-                yield chunk
+            return
+
+        # Fallback logic
+        excluded_models = []
+        max_attempts = 3
+        for attempt in range(max_attempts):
+            target_model = model or self.model_manager.get_next_available_model(self.current_quality, excluded_models)
+            try:
+                async for chunk in self.openrouter_client.create_message(
+                    messages=messages,
+                    model=target_model,
+                    temperature=0.7,
+                    max_tokens=2000,
+                    stream=True
+                ):
+                    yield chunk
+                self.model_manager.update_model_status(target_model, "active")
+                return
+            except Exception as e:
+                logger.warning(f"Model {target_model} failed (attempt {attempt + 1}/{max_attempts}): {e}")
+                if "429" in str(e) or "503" in str(e) or "Rate limit" in str(e):
+                    self.model_manager.update_model_status(target_model, "cooldown", retry_after=120)
+                excluded_models.append(target_model)
+                if attempt == max_attempts - 1:
+                    raise Exception("All AI models failed or busy.")

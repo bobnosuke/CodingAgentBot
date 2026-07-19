@@ -1,0 +1,20 @@
+{
+  "high_quality": [
+    "openai/gpt-oss-20b:free",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "nvidia/nemotron-3-super-120b-a12b:free"
+  ],
+  "reasoning": [
+    "openai/gpt-oss-20b:fre"
+  ],
+  "standard": [
+    "nvidia/nemotron-3-nano-30b-a3b:free",
+    "cohere/north-mini-code:free",
+    "poolside/laguna-m.1:free"
+  ],
+  "fast": [
+    "nvidia/nemotron-nano-9b-v2:free",
+    "poolside/laguna-xs-2.1:free",
+    "nvidia/nemotron-nano-12b-v2-vl:free"
+  ]
+}

@@ -43,8 +43,6 @@ class Config:
     MAX_FILE_SIZE_MB = 25  # Discord's file size limit
     MAX_FILES_PER_SESSION = 50
     
-    # Gemini API
-    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
     CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY", "")
 
     # AI Configuration
@@ -54,19 +52,27 @@ class Config:
     @classmethod
     def validate(cls) -> bool:
         """Validate required configuration"""
-        required = ["DISCORD_TOKEN", "OPENROUTER_API_KEY"]
-        # If GEMINI_API_KEY is not set, CEREBRAS_API_KEY is required for requirement definition
-        if not cls.GEMINI_API_KEY:
-            required.append("CEREBRAS_API_KEY")
-        missing = [key for key in required if not getattr(cls, key)]
-        
+    
+        required = [
+            "DISCORD_TOKEN",
+            "OPENROUTER_API_KEY",
+            "CEREBRAS_API_KEY"
+        ]
+    
+        missing = [
+            key for key in required
+            if not getattr(cls, key)
+        ]
+    
         if missing:
-            print(f"❌ 必須の設定が不足しています: {", ".join(missing)}")
+            print(f"❌ 必須の設定が不足しています: {', '.join(missing)}")
             return False
-        
+    
         # Create necessary directories
         cls.STORAGE_DIR.mkdir(exist_ok=True)
         cls.LOGS_DIR.mkdir(exist_ok=True)
-        
+    
         print("✅ 設定が正常に検証されました")
         return True
+        
+print("Cerebras Key:", bool(Config.CEREBRAS_API_KEY))
