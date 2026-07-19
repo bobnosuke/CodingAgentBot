@@ -119,7 +119,19 @@
         "NO_ACTIVE_SESSION": "❌ No active session found. Please start a session with `/coding start`.",
         "NO_ACTIVE_PROJECT": "❌ No active project found.",
         "README_NOT_FOUND": "❌ README.md not found.",
-        "README_TOO_LONG": "⚠️ README.md content is too long, sending as a file."
+        "README_TOO_LONG": "⚠️ README.md content is too long, sending as a file.",
+        "REQUIREMENT_PLAN_GENERATED": "Implementation plan generated and added to task queue.",
+        "TASK_PROCESSING_STARTED": "Task Processing Started",
+        "TASK_PROCESSING_DESC": "Task processing has started. Progress will be updated regularly.",
+        "ORCHESTRATOR_START": "Orchestrator has started the development cycle.",
+        "NO_TASKS_FOUND": "No tasks found for this requirement.",
+        "PROCESSING_TASK": "Processing task {task_id}: {description}",
+        "TASK_FAILED_RETRY": "Task {task_id} failed (attempt {attempt}/{max_retries}). Error: {error}. Retrying.",
+        "DEBUG_FAILED": "Debugging for task {task_id} failed. Error: {error}",
+        "DEBUG_APPLIED": "Debugger applied fixes for task {task_id}.",
+        "TASK_FAILED_FINAL": "Task {task_id} failed after all attempts. Error: {error}",
+        "TASK_COMPLETED": "Task {task_id} completed.",
+        "ALL_TASKS_COMPLETED": "All tasks completed."
     },
     "FILE": {
         "DOWNLOAD_TITLE": "📦 File Download",

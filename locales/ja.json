@@ -119,7 +119,19 @@
         "NO_ACTIVE_SESSION": "❌ アクティブなセッションがありません。`/coding start` でセッションを開始してください。",
         "NO_ACTIVE_PROJECT": "❌ アクティブなプロジェクトがありません。",
         "README_NOT_FOUND": "❌ README.md が見つかりませんでした。",
-        "README_TOO_LONG": "⚠️ README.md の内容が長すぎるため、ファイルとして送信します。"
+        "README_TOO_LONG": "⚠️ README.md の内容が長すぎるため、ファイルとして送信します。",
+        "REQUIREMENT_PLAN_GENERATED": "実装計画が生成され、タスクキューに追加されました。",
+        "TASK_PROCESSING_STARTED": "タスク処理開始",
+        "TASK_PROCESSING_DESC": "タスクの処理を開始しました。進捗は随時更新されます。",
+        "ORCHESTRATOR_START": "オーケストレーターが開発サイクルを開始しました。",
+        "NO_TASKS_FOUND": "この要件に対するタスクが見つかりませんでした。",
+        "PROCESSING_TASK": "タスク {task_id} を処理中: {description}",
+        "TASK_FAILED_RETRY": "タスク {task_id} が失敗しました (試行 {attempt}/{max_retries})。エラー: {error}。再試行します。",
+        "DEBUG_FAILED": "タスク {task_id} のデバッグに失敗しました。エラー: {error}",
+        "DEBUG_APPLIED": "デバッガーがタスク {task_id} の修正を適用しました。",
+        "TASK_FAILED_FINAL": "タスク {task_id} がすべての試行で失敗しました。エラー: {error}",
+        "TASK_COMPLETED": "タスク {task_id} が完了しました。",
+        "ALL_TASKS_COMPLETED": "すべてのタスクが完了しました。"
     },
     "FILE": {
         "DOWNLOAD_TITLE": "📦 ファイルダウンロード",
