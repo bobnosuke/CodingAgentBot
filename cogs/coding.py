@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 from discord import app_commands
 from logger import setup_logger
-from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository, UsageLogRepository, TaskRepository
+from modules.database.repository import UserRepository, APIKeyRepository, MessageRepository, SessionRepository, UsageLogRepository, TaskRepository, RequirementRepository
 from modules.session.manager import SessionManager
 from modules.ai.openrouter import OpenRouterClient, AIService, CerebrasClient
 from config import Config
@@ -112,6 +112,11 @@ class CodingPanelView(discord.ui.View):
         self.bot = bot
         self.session_manager = SessionManager(bot)
         self.project_manager = WorkspaceManager()
+        openrouter_client = OpenRouterClient(api_key=Config.OPENROUTER_API_KEY, base_url=Config.OPENROUTER_BASE_URL)
+        cerebras_client = CerebrasClient(api_key=Config.CEREBRAS_API_KEY) if Config.CEREBRAS_API_KEY else None
+        ai_service = AIService(openrouter_client=openrouter_client, cerebras_client=cerebras_client)
+        self.planner_agent = PlannerAgent(ai_service) # Initialize PlannerAgent
+        self.task_repository = TaskRepository()
     
     async def _get_user_lang(self, interaction: discord.Interaction):
         db_session = self.bot.db_manager.get_session()
@@ -164,7 +169,7 @@ class CodingPanelView(discord.ui.View):
         db_session = self.bot.db_manager.get_session()
         try:
             user = await UserRepository.get_or_create_user(db_session, user_id, interaction.user.name, interaction.user.discriminator)
-            api_key = await APIKeyRepository.get_active_api_key(db_session, user.id)
+            api_key = await self.bot.get_api_key(user.id)
             
             if not api_key:
                 await interaction.followup.send(i18n.translate(lang, "CODING.API_KEY_MISSING"), ephemeral=True)
@@ -175,12 +180,19 @@ class CodingPanelView(discord.ui.View):
             short_uuid = str(uuid.uuid4())[:8]
             channel_name = f"session-{short_uuid}"
             
-            session_uuid, coding_room, db_session_id = await self.session_manager.create_session(
+            session_uuid, coding_room = await self.session_manager.create_session(
                 db_session, 
                 interaction.user, 
                 interaction.guild, 
                 project_name=channel_name
             )
+            # Retrieve db_session_id from the active_sessions cache
+            session_info = self.session_manager.active_sessions.get(session_uuid)
+            db_session_id = session_info["db_session_id"] if session_info else (await SessionRepository.get_session_by_uuid(db_session, session_uuid)).id
+            if db_session_id is None:
+                logger.error(f"Could not retrieve db_session_id for session {session_uuid}")
+                await interaction.followup.send(i18n.translate(lang, "COMMON.ERROR", error="Failed to create session in database."), ephemeral=True)
+                return
 
             # Fetch the latest requirement for this session
             # Create a dummy requirement for now, this will be replaced by actual requirement from Gemini
@@ -198,20 +210,20 @@ class CodingPanelView(discord.ui.View):
                 planned_tasks = await self.planner_agent.plan_task(latest_requirement.json_data)
 
                 # Persist tasks to the database
-                for i, task_data in enumerate(planned_tasks.get("tasks", [])):
+                for i, task_data in enumerate(planned_tasks):
                     await self.task_repository.create_task(
                 db_session,
                 db_session_id,
-                latest_requirement.id,
+                user.id, # user_id
+                latest_requirement.id, # requirement_id
                 i + 1, # task_id
-                user.id,
                         task_data.get("type"),
                         task_data.get("role"),
                         task_data.get("description"),
                         task_data.get("assigned_to")
                     )
                 await RequirementRepository.update_requirement(db_session, latest_requirement.id, status="planned")
-                logger.info(f"Planned {len(planned_tasks.get('tasks', []))} tasks for requirement {latest_requirement.id}")
+                logger.info(f"Planned {len(planned_tasks)} tasks for requirement {latest_requirement.id}")
             else:
                 logger.warning(f"No latest requirement found for session {db_session_id}")
             

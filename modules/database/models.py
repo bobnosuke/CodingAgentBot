@@ -32,6 +32,7 @@ class User(Base):
     sessions = relationship("Session", back_populates="user", cascade="all, delete-orphan")
     usage_logs = relationship("UsageLog", back_populates="user", cascade="all, delete-orphan")
     requirements = relationship("Requirement", back_populates="user", cascade="all, delete-orphan", primaryjoin="User.id == Requirement.user_id")
+    tasks = relationship("Task", back_populates="user", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime, default=utc_now)
@@ -91,7 +92,7 @@ class Session(Base):
     messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
     projects = relationship("Project", back_populates="session", cascade="all, delete-orphan")
     requirements = relationship("Requirement", back_populates="session", cascade="all, delete-orphan")
-    tasks = relationship("Task", back_populates="session", cascade="all, delete-orphan", primaryjoin="foreign(Session.id) == Task.session_id")
+    tasks = relationship("Task", back_populates="session", cascade="all, delete-orphan")
     
     # Timestamps
     created_at = Column(DateTime, default=utc_now)

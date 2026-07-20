@@ -12,12 +12,16 @@ class PlannerAgent:
         self.ai_service = ai_service
 
     async def plan_task(self, user_request: str, history: List[Dict[str, str]] = []) -> List[Dict[str, Any]]:
-        logger.info(f"Planning task for: {user_request[:50]}...")
+        if isinstance(user_request, dict):
+            user_request_str = json.dumps(user_request)
+        else:
+            user_request_str = user_request
+        logger.info(f"Planning task for: {user_request_str[:50]}...")
 
         response_text = ""
         try:
             async for chunk in self.ai_service.chat(
-                user_message=user_request,
+                user_message=user_request_str,
                 conversation_history=history,
                 system_override=PLANNER_PROMPT,
                 language="ja",

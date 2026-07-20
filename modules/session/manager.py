@@ -56,6 +56,12 @@ class SessionManager:
                 discord_user.discriminator
             )
 
+            # Close any existing active sessions for the user
+            existing_active_session = await SessionRepository.get_active_session(db_session, user.id)
+            if existing_active_session:
+                await SessionRepository.close_session(db_session, existing_active_session.id)
+                logger.info(f"Closed existing active session {existing_active_session.session_uuid} for user {user.id}")
+
             # Generate session UUID (userID-shortUUID)
             short_uuid = str(uuid.uuid4())[:8]
             session_uuid = f"{discord_user.id}-{short_uuid}"

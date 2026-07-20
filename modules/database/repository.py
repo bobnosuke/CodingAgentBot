@@ -260,6 +260,30 @@ class SessionRepository:
             raise
     
     @staticmethod
+    async def deactivate_all_sessions(session: AsyncSession) -> None:
+        """Deactivate all active sessions"""
+        try:
+            stmt = update(Session).values(is_active=False)
+            await session.execute(stmt)
+            await session.commit()
+            logger.info("Deactivated all sessions")
+        except Exception as e:
+            logger.error(f"Error in deactivate_all_sessions: {e}")
+            await session.rollback()
+            raise
+
+    @staticmethod
+    async def get_session_by_uuid(session: AsyncSession, session_uuid: str) -> Optional[Session]:
+        """Get session by UUID"""
+        try:
+            stmt = select(Session).where(Session.session_uuid == session_uuid)
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error in get_session_by_uuid: {e}")
+            raise
+
+    @staticmethod
     async def count_user_sessions(session: AsyncSession, user_id: int) -> int:
         """Count total sessions for a specific user"""
         try:
@@ -492,6 +516,17 @@ class RequirementRepository:
     async def approve_requirement(session: AsyncSession, requirement_id: int) -> Optional[Requirement]:
         """Set requirement status to approved"""
         return await RequirementRepository.update_requirement(session, requirement_id, status="approved")
+
+    @staticmethod
+    async def get_requirements_by_session(session: AsyncSession, session_id: int) -> List[Requirement]:
+        """Get all requirements for a given session"""
+        try:
+            stmt = select(Requirement).where(Requirement.session_id == session_id).order_by(Requirement.created_at)
+            result = await session.execute(stmt)
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(f"Error in get_requirements_by_session: {e}")
+            raise
 
     @staticmethod
     async def get_latest_requirement_by_session(session: AsyncSession, session_id: int) -> Optional[Requirement]:
