@@ -509,7 +509,7 @@ class CodingCog(commands.Cog):
                 from modules.database.repository import RequirementRepository
                 import json
                 
-                agent = CodingAgent(ai_service)
+                agent = CodingAgent(ai_service, self.bot.db_manager, self.bot)
                 response_msg = await message.reply(i18n.translate(lang, "CODING.THINKING"))
                 
                 # Phase 1: Requirement Definition
