@@ -1,0 +1,1 @@
+us_ec=$?; trap '' PIPE; printf "%d:%s\n" $__manus_ec "$PWD" 2>/dev/null >&3; trap - PIPE source /home/ubuntu/.user_env source /home/ubuntu/.user_env source /home/ubuntu/.user_env source /home/ubuntu/.user_env source /home/ubuntu/.user_env source /home/ubuntu/.user_env
