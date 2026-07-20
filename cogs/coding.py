@@ -523,6 +523,7 @@ class CodingCog(commands.Cog):
                 requirement = await RequirementRepository.create_requirement(
                     db_session, 
                     session_info["db_session_id"], 
+                    user.id,
                     requirement_json
                 )
 

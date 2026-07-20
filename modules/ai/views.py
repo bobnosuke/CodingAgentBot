@@ -29,7 +29,7 @@ class RequirementApprovalView(discord.ui.View):
         self.refine_count = 0
         self.db_manager = agent.db_manager
         self.bot = agent.bot # Pass bot instance for session_manager access
-        self.orchestrator = Orchestrator(agent.ai_service, self.db_manager.get_session, lambda msg, status: self._update_progress_callback(interaction, msg, status), self.bot.session_manager)
+        self.orchestrator = Orchestrator(agent.ai_service, self.db_manager.get_session, self._update_progress_callback)
         
     @discord.ui.button(label="開発を開始", style=discord.ButtonStyle.green, emoji="🚀")
     async def approve(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -48,7 +48,7 @@ class RequirementApprovalView(discord.ui.View):
             )
 
             if not requirement:
-                return await interaction.followup.send(
+                return await self.interaction.followup.send(
                     "❌ 要件データが見つかりませんでした。",
                     ephemeral=True
                 )
@@ -67,22 +67,22 @@ class RequirementApprovalView(discord.ui.View):
                     break
 
             if not session_id:
-                return await interaction.followup.send(
+                return await self.interaction.followup.send(
                     "❌ セッションが見つかりませんでした。",
                     ephemeral=True
                 )
 
-            await self.orchestrator.start_development_cycle(session_id, self.requirement_id, interaction)
+            await self.orchestrator.execute_development_cycle(session_id, self.requirement_id, self.interaction)
 
             embed = discord.Embed(title="🚀 開発プロセス開始", description="Orchestratorが開発サイクルを開始しました。", color=discord.Color.blue())
-            await interaction.followup.send(embed=embed)
+            await self.interaction.followup.send(embed=embed)
 
         except Exception as e:
-            await interaction.followup.send(f"エラーが発生しました: {e}", ephemeral=True)
+            await self.interaction.followup.send(f"エラーが発生しました: {e}", ephemeral=True)
         finally:
             await db_session.close()
 
-    async def _update_progress_callback(self, interaction: discord.Interaction, msg: str, status: str):
+    async def _update_progress_callback(self, msg: str, status: str):
         emoji = "⚙️"
         if status == "setup": emoji = "🏗️"
         elif status == "generating": emoji = "🧠"
@@ -103,18 +103,18 @@ class RequirementApprovalView(discord.ui.View):
         )
         try:
             requirement = await RequirementRepository.get_requirement(
-                self.db_manager.get_session(),
+                db_session,
                 self.requirement_id
             )
         
             if not requirement:
-                return await interaction.followup.send(
+                return await self.interaction.followup.send(
                     "❌ 要件データが見つかりませんでした。",
                     ephemeral=True
                 )
         
             await RequirementRepository.update_requirement(
-                self.db_manager.get_session(),
+                db_session,
                 self.requirement_id,
                 status="approved"
             )
@@ -138,24 +138,24 @@ class RequirementApprovalView(discord.ui.View):
                     break
 
             if not session_id:
-                logger.error(f"Could not find session_id for channel {interaction.channel_id}")
-                return await interaction.followup.send(
+                logger.error(f"Could not find session_id for channel {self.interaction.channel_id}")
+                return await self.interaction.followup.send(
                     i18n.translate(self.lang, "COMMON.ERROR", error="Session not found."),
                     ephemeral=True
                 )
 
             # Start processing tasks
             # Orchestrator will handle task processing
-            await self.orchestrator.start_development_cycle(session_id, self.requirement_id, interaction)
+            await self.orchestrator.execute_development_cycle(session_id, self.requirement_id, self.interaction)
         
         finally:
-            await self.db_manager.get_session().close()
+            await db_session.close()
 
         # ファイル保存ロジック（実際にはSessionManager等を通じて行う）
         embed = discord.Embed(title=i18n.translate(self.lang, "CODING.IMPLEMENTATION_SUCCESS"), color=discord.Color.green())
         embed.add_field(name=i18n.translate(self.lang, "CODING.REQUIREMENT_PLAN"), value=i18n.translate(self.lang, "CODING.REQUIREMENT_PLAN_GENERATED"), inline=False)
         embed.add_field(name=i18n.translate(self.lang, "CODING.TASK_PROCESSING_STARTED"), value=i18n.translate(self.lang, "CODING.TASK_PROCESSING_DESC"), inline=False)
-        await interaction.followup.send(embed=embed)
+        await self.interaction.followup.send(embed=embed)
 
 
 
@@ -190,10 +190,10 @@ class RefinementModal(discord.ui.Modal, title="Refine Requirements"):
         self.parent_view.refine_count += 1
         
         # Get current requirement from DB
-        db = interaction.client.db_manager.get_session()
+        db_session = interaction.client.db_manager.get_session()
         try:
             current_req = await RequirementRepository.get_requirement(
-                self.db_manager.get_session(),
+                db_session,
                 self.parent_view.requirement_id
             )
             if not current_req:
@@ -218,7 +218,7 @@ class RefinementModal(discord.ui.Modal, title="Refine Requirements"):
             
             # Update requirement in DB
             await RequirementRepository.update_requirement(
-                self.db_manager.get_session(), 
+                db_session, 
                 self.parent_view.requirement_id, 
                 json_data=new_req
             )
@@ -231,4 +231,4 @@ class RefinementModal(discord.ui.Modal, title="Refine Requirements"):
             
             await interaction.edit_original_response(embed=embed, view=self.parent_view)
         finally:
-            await self.db_manager.get_session().close()
+            await db_session.close()
