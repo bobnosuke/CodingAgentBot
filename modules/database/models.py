@@ -245,6 +245,22 @@ class Task(Base):
     user = relationship("User", back_populates="tasks")
     requirement = relationship("Requirement", back_populates="tasks")
 
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "session_id": self.session_id,
+            "requirement_id": self.requirement_id,
+            "task_id": self.task_id,
+            "type": self.type,
+            "role": self.role,
+            "description": self.description,
+            "assigned_to": self.assigned_to,
+            "status": self.status,
+            "result": self.result,
+            "created_at": self.created_at.isoformat() if self.created_at else None,
+            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+        }
+
     # Timestamps
     created_at = Column(DateTime, default=utc_now)
     updated_at = Column(DateTime, default=utc_now, onupdate=utc_now)

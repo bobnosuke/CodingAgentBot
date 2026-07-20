@@ -5,7 +5,7 @@ from modules.planner.planner import PlannerAgent
 from modules.coder.coder import CoderAgent
 from modules.debugger.debugger import DebuggerAgent
 from modules.workspace.manager import WorkspaceManager
-from modules.database.repository import TaskRepository, RequirementRepository
+from modules.database.repository import TaskRepository, RequirementRepository, SessionRepository
 import asyncio
 
 logger = setup_logger(__name__)
@@ -40,13 +40,28 @@ class Orchestrator:
             for task in tasks:
                 await self.update_progress(i18n.translate(interaction.locale, "CODING.PROCESSING_TASK", task_id=task.task_id, description=task.description), "generating")
                 
-                project_info = await interaction.client.session_manager.get_session_project_info(session_id)
-                if not project_info:
-                    logger.error(f"Project info not found for session {session_id}")
-                    await self.update_progress(i18n.translate(interaction.locale, "COMMON.ERROR", error="Project not found."), "error")
-                    await TaskRepository.update_task_status(db_session, task.id, "failed", {"error": "Project info not found"})
+                db_session_obj = await SessionRepository.get_session_by_id(db_session, session_id)
+                if not db_session_obj:
+                    logger.error(f"Session not found in DB for session_id: {session_id}")
+                    await self.update_progress(i18n.translate(interaction.locale, "COMMON.ERROR", error="Session not found."), "error")
+                    await TaskRepository.update_task_status(db_session, task.id, "failed", {"error": "Session not found"})
                     continue
                 
+                # project_id is stored in the Session object itself
+                # Ensure project_name is available for workspace_manager
+                if not db_session_obj.project_name:
+                    logger.error(f"Project name not found for session_id: {session_id}")
+                    await self.update_progress(i18n.translate(interaction.locale, "COMMON.ERROR", error="Project name not found."), "error")
+                    await TaskRepository.update_task_status(db_session, task.id, "failed", {"error": "Project name not found"})
+                    continue
+                
+                project_files_dir = self.workspace_manager.get_project_path(db_session_obj.user_id, db_session_obj.project_name)
+                if not project_files_dir:
+                    logger.error(f"Project files directory not found for session {session_id}")
+                    await self.update_progress(i18n.translate(interaction.locale, "COMMON.ERROR", error="Project files directory not found."), "error")
+                    await TaskRepository.update_task_status(db_session, task.id, "failed", {"error": "Project files directory not found"})
+                    continue
+                project_info = {"files_dir": project_files_dir}
                 current_files = await self.workspace_manager.get_project_files_content(project_info["files_dir"])
 
                 max_retries = 3

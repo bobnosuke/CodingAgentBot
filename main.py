@@ -31,6 +31,8 @@ class CoderAgent(commands.Bot):
         # Initialize encryption manager with key from environment
         master_key = os.getenv("ENCRYPTION_KEY")
         self.encryption_manager = EncryptionManager(master_key)
+        from modules.session.manager import SessionManager
+        self.session_manager = SessionManager(self)
 
     async def setup_hook(self):
         logger.info("Setting up bot hooks...")

@@ -201,7 +201,7 @@ class CodingPanelView(discord.ui.View):
                 db_session,
                 db_session_id,
                 user.id,
-                {"task_summary": "Initial setup", "technical_requirements": []}
+                json_data=json.dumps({"task_summary": "Initial setup", "technical_requirements": []})
             )
             latest_requirement = dummy_requirement
 
@@ -521,10 +521,10 @@ class CodingCog(commands.Cog):
 
                 # Store requirement in DB
                 requirement = await RequirementRepository.create_requirement(
-                    db_session, 
-                    session_info["db_session_id"], 
-                    user.id,
-                    requirement_json
+                    session=db_session, 
+                    session_id=session_info["db_session_id"], 
+                    user_id=user.id,
+                    json_data=requirement_json
                 )
 
                 # Display Requirements to User

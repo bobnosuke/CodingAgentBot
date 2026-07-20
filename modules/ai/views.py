@@ -99,63 +99,8 @@ class RequirementApprovalView(discord.ui.View):
         await self.interaction.edit_original_response(
             content=None,
             embed=embed,
-            view=None
+            view=self # Keep the view for further interactions if needed
         )
-        try:
-            requirement = await RequirementRepository.get_requirement(
-                db_session,
-                self.requirement_id
-            )
-        
-            if not requirement:
-                return await self.interaction.followup.send(
-                    "❌ 要件データが見つかりませんでした。",
-                    ephemeral=True
-                )
-        
-            await RequirementRepository.update_requirement(
-                db_session,
-                self.requirement_id,
-                status="approved"
-            )
-        
-            requirement_json = requirement.json_data
-        
-            if isinstance(requirement_json, str):
-                requirement_json = json.loads(requirement_json)
-        
-            # Instead of directly executing the task, we now assume tasks are already planned and stored in the DB
-            # The actual execution will be handled by an orchestrator or a separate task processing mechanism.
-            # For now, we just mark the requirement as approved and log the action.
-            logger.info(f"Requirement {self.requirement_id} approved. Tasks should be processed by orchestrator.")
-        
-            # Get the session_id from the interaction channel
-            session_id = None
-            active_sessions = self.bot.session_manager.active_sessions
-            for uuid, info in active_sessions.items():
-                if info["channel_id"] == str(interaction.channel_id):
-                    session_id = info["db_session_id"]
-                    break
-
-            if not session_id:
-                logger.error(f"Could not find session_id for channel {self.interaction.channel_id}")
-                return await self.interaction.followup.send(
-                    i18n.translate(self.lang, "COMMON.ERROR", error="Session not found."),
-                    ephemeral=True
-                )
-
-            # Start processing tasks
-            # Orchestrator will handle task processing
-            await self.orchestrator.execute_development_cycle(session_id, self.requirement_id, self.interaction)
-        
-        finally:
-            await db_session.close()
-
-        # ファイル保存ロジック（実際にはSessionManager等を通じて行う）
-        embed = discord.Embed(title=i18n.translate(self.lang, "CODING.IMPLEMENTATION_SUCCESS"), color=discord.Color.green())
-        embed.add_field(name=i18n.translate(self.lang, "CODING.REQUIREMENT_PLAN"), value=i18n.translate(self.lang, "CODING.REQUIREMENT_PLAN_GENERATED"), inline=False)
-        embed.add_field(name=i18n.translate(self.lang, "CODING.TASK_PROCESSING_STARTED"), value=i18n.translate(self.lang, "CODING.TASK_PROCESSING_DESC"), inline=False)
-        await self.interaction.followup.send(embed=embed)
 
 
 
